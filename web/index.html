@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>代码实验台</title>
+  <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="lab.css">
+  <link rel="stylesheet" href="data-visuals.css">
+  <script src="syntax.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="lab">
+    <header class="toolbar" aria-label="运行控制">
+      <label class="example-label"><span class="sr-only">课例</span><select id="example" aria-label="课例"><option value="swap">变量交换</option><option value="array">数组求和</option><option value="function">函数参数</option><option value="matrix">二维遍历</option><option value="prefix">前缀和</option><option value="containers">vector 与 string</option><option value="adjacent">相邻交换</option><option value="recursive">递归数组</option></select></label>
+      <button id="start">开始</button>
+      <button id="next" class="primary" disabled>下一步</button>
+      <button id="play" disabled>▶ 播放</button>
+      <button id="pause" disabled hidden>Ⅱ 暂停</button>
+      <button id="stop" disabled>停止</button>
+      <label class="speed-label">速度 <select id="speed" aria-label="播放速度"><option value="1200">慢</option><option value="650" selected>中</option><option value="300">快</option><option value="120">很快</option></select></label>
+      <div class="status-box" role="status" aria-live="polite"><span id="status">待运行</span><span id="position">先填写输入，再开始运行</span></div>
+      <details class="more-menu">
+        <summary>更多</summary>
+        <div class="more-content">
+          <div class="menu-row"><button id="step" disabled title="进入函数内部">进入函数</button><button id="over" disabled title="执行完函数调用">跳过函数</button><button id="restart" disabled>重新运行</button></div>
+          <div class="menu-row"><label class="standard-label">标准 <select id="standard"><option value="c++14">C++14</option><option value="c++11">C++11</option></select></label></div>
+          <div class="menu-row"><label>动效 <select id="motion" aria-label="动效设置"><option value="standard">标准</option><option value="reduced">减少</option><option value="off">关闭</option></select></label><span class="subtle">标准模式遵循系统减少动态效果设置</span></div>
+          <div class="menu-row"><label>代码配色 <select id="code-theme" aria-label="代码配色"><option value="light">VS Code Light+ · 浅色</option><option value="dark">VS Code Dark+ · 深色</option><option value="dracula">Dracula · 紫黑</option></select></label></div>
+          <div class="menu-row case-bar" aria-label="课例保存与载入"><button id="save-case" type="button">保存课例</button><button id="load-case" type="button">载入课例</button><button id="restore-case" type="button">最近课例</button><input id="case-file" type="file" accept="application/json,.json" hidden><span id="case-hint" hidden></span></div>
+          <div class="menu-row connection-row"><span id="connection">连接中…</span><button id="reconnect">重新连接</button></div>
+        </div>
+      </details>
+    </header>
+    <div id="notice" class="notice" role="alert" hidden><span id="notice-message"></span><button id="dismiss-notice" type="button" aria-label="关闭提示">×</button></div>
+    <div class="workspace">
+      <section class="panel source-panel" aria-labelledby="source-title">
+        <div class="panel-head"><h2 id="source-title">代码</h2><div class="view-tabs"><button id="edit" aria-pressed="true">编辑</button><button id="view" aria-pressed="false">执行</button></div><span id="line-hint" hidden></span></div>
+        <div id="editor" class="editor"><pre id="edit-lines" aria-hidden="true">1</pre><div class="source-wrap"><pre id="edit-highlight" aria-hidden="true"></pre><textarea id="source" aria-label="C++ 代码" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off"></textarea></div></div>
+        <pre id="code-view" class="code-view" tabindex="0" aria-label="代码执行位置" hidden></pre>
+      </section>
+      <div id="code-splitter" class="splitter vertical-splitter" role="separator" aria-label="调整代码宽度" aria-orientation="vertical" tabindex="0"></div>
+      <div class="inspector">
+        <div class="state-grid">
+          <section class="panel variables-panel" aria-labelledby="variables-title">
+            <div class="panel-head"><h2 id="variables-title">变量</h2><span id="frame">—</span><details class="stack"><summary>调用栈 <span id="frame-count">0 层</span></summary><ol id="frames"></ol></details></div>
+            <div class="variables-body">
+              <section class="locals-section"><h3>当前调用</h3><div class="variable-scroll"><table><thead><tr><th>变量</th><th>值</th><th>上一步</th></tr></thead><tbody id="locals"><tr><td colspan="3" class="empty">—</td></tr></tbody></table></div></section>
+              <section id="globals-section"><h3>全局</h3><div class="variable-scroll"><table><thead><tr><th>变量</th><th>值</th><th>上一步</th></tr></thead><tbody id="globals"><tr><td colspan="3" class="empty">—</td></tr></tbody></table></div></section>
+            </div>
+          </section>
+          <div id="variables-splitter" class="splitter horizontal-splitter" role="separator" aria-label="调整变量与数组区域高度" aria-orientation="horizontal" tabindex="0"></div>
+          <section class="panel data-panel" aria-labelledby="data-title">
+            <div class="panel-head"><h2 id="data-title">数组与容器</h2><select id="data-frame" aria-label="查看调用帧"></select></div>
+            <div class="data-body">
+              <div id="frame-variables" hidden><h3>所选调用帧</h3><div class="variable-scroll"><table><thead><tr><th>变量</th><th>值</th><th>上一步</th></tr></thead><tbody id="frame-locals"></tbody></table></div></div>
+              <div id="data-views" class="data-views"><p class="empty">—</p></div>
+            </div>
+          </section>
+        </div>
+        <div id="io-splitter" class="splitter horizontal-splitter" role="separator" aria-label="调整输入输出高度" aria-orientation="horizontal" tabindex="0"></div>
+        <div class="io-grid">
+          <section class="panel input-panel"><div class="panel-head"><h2><label for="stdin">输入</label></h2><span id="input-hint" class="subtle">开始前填写</span></div><textarea id="stdin" aria-label="标准输入" spellcheck="false" placeholder="在开始前填写全部输入数据"></textarea><pre id="stdin-view" aria-label="输入读取位置" tabindex="0" hidden></pre></section>
+          <section class="panel output-panel"><div class="panel-head"><h2>输出</h2></div><pre id="stdout" aria-label="标准输出" tabindex="0"></pre></section>
+        </div>
+      </div>
+    </div>
+    <div class="history-bar" aria-label="历史回看">
+      <span class="state-legend" aria-label="状态图例"><span>➜ 下一条</span><span>◆ 本步变化</span></span>
+      <strong id="history-state">执行历史</strong>
+      <button id="history-prev" disabled aria-label="历史上一步" title="历史上一步">◀</button>
+      <button id="history-next" disabled aria-label="历史下一步" title="历史下一步">▶</button>
+      <input id="history-slider" type="range" min="0" max="0" value="0" disabled aria-label="历史位置">
+      <span id="history-count">尚未运行</span>
+      <button id="history-latest" disabled>返回最新</button>
+    </div>
+    <details id="error-details" class="error-details" hidden><summary>错误输出</summary><pre id="stderr" aria-label="错误输出"></pre></details>
+    <section id="diagnostics" class="panel diagnostics" hidden><div class="panel-head"><h2>编译信息</h2><button id="dismiss-diagnostics" type="button" aria-label="关闭编译信息">×</button></div><div id="diagnostic-links"></div><pre id="compiler-output"></pre></section>
+  </main>
+</body>
+</html>

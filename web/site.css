@@ -1,0 +1,70 @@
+/* 课堂视觉基础：区域颜色负责定位，状态颜色负责解释本步变化。 */
+:root {
+  color-scheme: light;
+  --bg: #f3f5f8; --surface: #fff; --surface-2: #f3f7fc;
+  --text: #20324b; --muted: #52667e; --accent: #2563c4;
+  --accent-soft: #eaf2ff; --border: #c7d7e8; --code-bg: #f8fbff;
+  --c-kw: #1b55b2; --c-cmt: #3d7548; --c-str: #a13e32; --c-num: #8c5b0d; --c-pre: #7b3ba0;
+  --region-code: #2563c4; --region-code-soft: #eaf2ff;
+  --region-variables: #7340bc; --region-variables-soft: #f2eaff;
+  --region-data: #087987; --region-data-soft: #e3f8fa;
+  --region-input: #98550c; --region-input-soft: #fff4d9;
+  --region-output: #26783b; --region-output-soft: #e8f8e9;
+  --region-history: #5144b8; --region-history-soft: #eeecff;
+  --state-next: #8c5a00; --state-next-soft: #fff0ad;
+  --state-change: #aa4e0a; --state-change-soft: #ffead1;
+  --state-index: #087987; --state-index-soft: #e3f8fa;
+  --state-success: #26783b; --state-success-soft: #e8f8e9;
+  --state-error: #b52b3d; --state-error-soft: #fff0f2;
+  --radius-sm: 7px; --radius-md: 11px; --radius-lg: 9px;
+  --shadow-panel: none;
+  --shadow-button: 0 3px 0 #b4c8df;
+  --shadow-primary: 0 3px 0 #17458b;
+  --motion-fast: 100ms; --motion-normal: 200ms; --motion-slow: 360ms;
+  --motion-ease: cubic-bezier(.2, .7, .3, 1);
+  --motion-spring: cubic-bezier(.2, 1.4, .4, 1);
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --font-mono: Consolas, 'Cascadia Code', 'Microsoft YaHei', monospace;
+}
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #152031; --surface: #1d2b3f; --surface-2: #25354c;
+  --text: #eaf2ff; --muted: #b2c4dc; --accent: #a4c5ff;
+  --accent-soft: #293f60; --border: #496080; --code-bg: #192639;
+  --c-kw: #8bb7ff; --c-cmt: #95bf9b; --c-str: #ecb5a3; --c-num: #dfc28c; --c-pre: #ceaff0;
+  --region-code: #a4c5ff; --region-code-soft: #293f60;
+  --region-variables: #cfb3ff; --region-variables-soft: #3c315b;
+  --region-data: #83dde5; --region-data-soft: #193f49;
+  --region-input: #f4cf87; --region-input-soft: #453b26;
+  --region-output: #9be0a9; --region-output-soft: #254431;
+  --region-history: #beb7ff; --region-history-soft: #34365c;
+  --state-next: #ffdb76; --state-next-soft: #514321;
+  --state-change: #ffc489; --state-change-soft: #503722;
+  --state-index: #83dde5; --state-index-soft: #193f49;
+  --state-success: #9be0a9; --state-success-soft: #254431;
+  --state-error: #ffb0be; --state-error-soft: #512d3b;
+  --shadow-panel: 0 2px 0 #08111c66, 0 5px 15px #0002;
+  --shadow-button: 0 3px 0 #0d1828;
+  --shadow-primary: 0 3px 0 #6d91c8;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.8 var(--font-body); }
+button, input, select { font: inherit; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+button, summary { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+button { color: inherit; transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+::selection { background: var(--accent-soft); }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 7px 13px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); box-shadow: var(--shadow-button); font: 600 14px/1.5 var(--font-body); white-space: nowrap; cursor: pointer; }
+.button:hover { border-color: var(--accent); }
+.button:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+.button-primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: var(--shadow-primary); }
+html[data-theme='dark'] .button-primary { color: #16233a; }
+.button-quiet { border-color: transparent; background: transparent; color: var(--muted); box-shadow: none; }
+button:disabled { opacity: .45; cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-fast: 0ms; --motion-normal: 0ms; --motion-slow: 0ms; }
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "code": "#include <iostream>\nusing namespace std;\n\nint f(int x) {  // x = 当前层的数\n    int a[2] = {};  // a = 当前调用独立的数组\n    a[0] = x;\n    if (x > 0) {\n        a[1] = f(x - 1);\n    }\n    return a[0] + a[1];\n}\n\nint main() {\n    int s = 0;  // s = 递归结果\n    s = f(2);\n    cout << s << endl;\n    return 0;\n}\n",
+  "input": "",
+  "display": {
+    "standard": "c++14",
+    "example": "recursive",
+    "mode": "edit",
+    "dataSettings": []
+  }
+}

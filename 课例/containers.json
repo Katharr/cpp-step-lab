@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "code": "#include <iostream>\n#include <vector>\n#include <string>\nusing namespace std;\n\nint main() {\n    vector<int> a = {3, 1};  // a = 可追加元素的数组\n    string b = \"abc\";  // b = 待修改的字符串\n    int i = 1;  // i = 待修改位置\n    a.push_back(4);\n    b[i] = 'x';\n    cout << a.size() << \" \" << b << endl;\n    return 0;\n}\n",
+  "input": "",
+  "display": {
+    "standard": "c++14",
+    "example": "containers",
+    "mode": "edit",
+    "dataSettings": []
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "code": "#include <iostream>\nusing namespace std;\n\nint main() {\n    int a[4] = {3, 1, 4, 2};  // a = 待交换的数组\n    int i = 1;  // i = 左侧元素下标\n    int t = a[i];  // t = 临时保存的数\n    a[i] = a[i + 1];\n    a[i + 1] = t;\n    i = 4;\n    cout << a[1] << \" \" << a[2] << endl;\n    return 0;\n}\n",
+  "input": "",
+  "display": {
+    "standard": "c++14",
+    "example": "adjacent",
+    "mode": "edit",
+    "dataSettings": []
+  }
+}
