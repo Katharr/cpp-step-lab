@@ -22,7 +22,7 @@ textarea { color: var(--text); background: var(--surface); border: 0; }
 .more-menu > summary { list-style: none; border: 1px solid var(--border); border-radius: 5px; padding: 5px 9px; background: var(--surface); }
 .more-menu > summary::after { content: ' ▾'; color: var(--muted); }
 .more-menu > summary::-webkit-details-marker { display: none; }
-.more-content { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; width: 350px; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); box-shadow: 0 8px 24px #0002; }
+.more-content { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; width: min(350px, calc(100vw - 16px)); max-height: calc(100dvh - 72px); overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); box-shadow: 0 8px 24px #0002; }
 .menu-row { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .menu-row:first-child { padding-top: 0; }
 .menu-row:last-child { border-bottom: 0; padding-bottom: 0; }

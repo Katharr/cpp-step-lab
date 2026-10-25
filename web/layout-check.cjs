@@ -109,6 +109,26 @@ const onlyMock = process.argv.includes('--mock');
     await page.goto(base);
     await page.evaluate(() => localStorage.clear());
     await page.reload();
+    await check('更多菜单：桌面与窄屏不越界，矮窗口可滚动并操作底部选项', async () => {
+      for (const size of [{ width: 1366, height: 768 }, { width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 240 }]) {
+        await page.setViewportSize(size);
+        await page.locator('.more-menu > summary').click();
+        const bounds = await page.locator('.more-content').evaluate((menu) => {
+          const rect = menu.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, height: menu.clientHeight, contentHeight: menu.scrollHeight };
+        });
+        assert.ok(bounds.left >= 0 && bounds.right <= size.width && bounds.top >= 0 && bounds.bottom <= size.height, `菜单超出视口：${JSON.stringify({ size, bounds })}`);
+        if (size.height === 240) assert.ok(bounds.contentHeight > bounds.height, '矮窗口菜单应在内部滚动');
+        await page.locator('#reconnect').click();
+        assert.equal(await page.locator('.more-menu').getAttribute('open'), null);
+        await page.locator('.more-menu > summary').click();
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.more-menu').getAttribute('open'), null);
+      }
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await page.evaluate(() => localStorage.clear());
+      await page.reload();
+    });
     const source = '// 同屏长代码验收\n' + Array.from({ length: 78 }, (_, index) => '// 第 ' + (index + 2) + ' 行').join('\n');
     await page.locator('#source').fill(source);
     await page.locator('#stdin').fill(input);
@@ -433,7 +453,7 @@ const onlyMock = process.argv.includes('--mock');
   } finally {
     await context.close();
     await browser.close();
-    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ status: checks.length === (onlyMock ? 6 : 8) && !errors.length ? 'passed' : 'failed', checks, measurements, pageErrors: errors, checkedAt: new Date().toISOString() }, null, 2));
+    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ status: checks.length === (onlyMock ? 7 : 9) && !errors.length ? 'passed' : 'failed', checks, measurements, pageErrors: errors, checkedAt: new Date().toISOString() }, null, 2));
   }
   console.log('同屏验收全部通过：' + checks.length + ' 项');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
