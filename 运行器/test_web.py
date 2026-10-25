@@ -1,16 +1,76 @@
 """真实 HTTP + GCC/GDB 验收；测试服务使用随机本机端口。"""
 from concurrent.futures import ThreadPoolExecutor
 import json
+from io import BytesIO
+from email.message import Message
 from pathlib import Path
 import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import Mock, patch
 import urllib.error
 import urllib.request
 import uuid
 
-from server import LabServer, ROOT, ensure_dependencies
+from server import Handler, LabServer, ROOT, ensure_dependencies
+
+
+class DisconnectionTests(unittest.TestCase):
+    def handler(self):
+        handler = Handler.__new__(Handler)
+        handler.server = Mock(server_port=8765)
+        handler.headers = Message()
+        handler.headers["Host"] = "127.0.0.1:8765"
+        handler.headers["Content-Type"] = "application/json"
+        handler.headers["Content-Length"] = "2"
+        handler.rfile = BytesIO(b"{}")
+        handler.wfile = Mock()
+        handler.connection = Mock()
+        handler.request_version = "HTTP/1.1"
+        handler.requestline = "POST /api/ping HTTP/1.1"
+        handler.command = "POST"
+        handler.path = "/api/ping"
+        handler.close_connection = False
+        return handler
+
+    def test_disconnect_during_headers_or_body_does_not_send_500(self):
+        for error in (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            for stage in ("headers", "body"):
+                with self.subTest(error=error, stage=stage):
+                    handler = self.handler()
+                    handler.wfile.write.side_effect = (
+                        error(10053, "连接已关闭") if stage == "headers"
+                        else [None, error(10053, "连接已关闭")])
+                    with patch.object(handler, "send_response", wraps=handler.send_response) as response, \
+                            patch("server.sys.stderr") as stderr:
+                        handler.do_POST()
+                    response.assert_called_once_with(200)
+                    stderr.write.assert_not_called()
+                    self.assertTrue(handler.close_connection)
+
+    def test_disconnect_while_reading_request(self):
+        handler = self.handler()
+        handler.rfile = Mock()
+        handler.rfile.read.side_effect = ConnectionAbortedError(10053, "连接已关闭")
+        handler.do_POST()
+        handler.wfile.write.assert_not_called()
+        handler.server.sessions.entry.assert_not_called()
+        self.assertTrue(handler.close_connection)
+
+    def test_unexpected_service_error_is_still_reported(self):
+        handler = self.handler()
+        handler.server.sessions.entry.side_effect = RuntimeError("测试内部错误")
+        with patch.object(handler, "respond") as response, patch("server.sys.stderr") as stderr:
+            handler.do_POST()
+        self.assertEqual(response.call_args.args[0], 500)
+        self.assertIn("RuntimeError", "".join(call.args[0] for call in stderr.write.call_args_list))
+
+    def test_unrelated_write_error_is_not_silenced(self):
+        handler = self.handler()
+        handler.wfile.write.side_effect = OSError("测试写入错误")
+        with self.assertRaises(OSError):
+            handler.respond(200, {})
 
 
 class WebTests(unittest.TestCase):

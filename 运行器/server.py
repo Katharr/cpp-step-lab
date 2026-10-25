@@ -193,21 +193,22 @@ class Handler(BaseHTTPRequestHandler):
     def respond(self, status, body, content_type="application/json; charset=utf-8"):
         if not isinstance(body, bytes):
             body = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        origin = self.headers.get("Origin")
-        port = self.server.server_port
-        if origin in ("null", f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
-            self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Vary", "Origin")
-        self.end_headers()
         try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            origin = self.headers.get("Origin")
+            port = self.server.server_port
+            if origin in ("null", f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+            self.end_headers()
             self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
-            pass
+        except ConnectionError:
+            # 网页可能已刷新或关闭；响应头和正文都可能断连，不再发送错误响应。
+            self.close_connection = True
 
     def do_OPTIONS(self):
         try:
@@ -220,6 +221,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
         except APIError as error:
             self.respond(error.status, {"error": str(error)})
+        except ConnectionError:
+            self.close_connection = True
 
     def do_GET(self):
         try:
@@ -281,6 +284,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 raise APIError("接口不存在", 404)
             self.respond(200, result)
+        except ConnectionError:
+            # 读取请求时断连同样无需向已关闭的连接返回 500。
+            self.close_connection = True
         except APIError as error:
             self.respond(error.status, {"error": str(error)})
         except (UnicodeError, json.JSONDecodeError, TimeoutError):
