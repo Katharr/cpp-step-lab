@@ -691,7 +691,9 @@ int main() {
   function renderInput() {
     const view = $('stdin-view');
     if (!view) return;
-    const running = Boolean(snapshot) && $('editor').hidden;
+    // 最新运行结束后直接恢复输入；回看历史时仍展示当步读取轨迹。
+    const running = Boolean(snapshot) && $('editor').hidden
+      && (snapshot.status === 'paused' || historyIndex < history.length - 1);
     $('input-hint').textContent = running ? '本次输入 · 重新运行前可修改' : '开始前填写';
     view.hidden = !running;
     $('stdin').hidden = running;

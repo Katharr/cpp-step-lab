@@ -116,6 +116,28 @@ const results = [];
       await finish(snapshot);
       assert.equal((await page.locator('#stdout').textContent()).trim(), '2 9007199254740993');
     });
+    await check('停止后可直接编辑输入，重跑使用新输入，历史保留读取轨迹', async () => {
+      await setCode('#include <iostream>\nint main() {\n    int x = 0;  // x = 输入的数\n    std::cin >> x;\n    std::cout << x;\n    return 0;\n}\n', '11\n');
+      let snapshot = await begin();
+      snapshot = await action('next');
+      assert.equal(await page.locator('#stdin-view').isVisible(), true);
+      assert.equal(await page.locator('#stdin').isVisible(), false);
+      await action('stop');
+      assert.equal(await page.locator('#stdin').isVisible(), true);
+      assert.equal(await page.locator('#stdin').isEditable(), true);
+      await page.locator('#history-prev').click();
+      assert.equal(await page.locator('#stdin-view').isVisible(), true);
+      assert.equal(await page.locator('#stdin').isVisible(), false);
+      await page.locator('#history-latest').click();
+      await page.locator('#stdin').fill('42\n');
+      snapshot = await begin();
+      await finish(snapshot);
+      assert.equal((await page.locator('#stdout').textContent()).trim(), '42');
+      assert.equal(await page.locator('#stdin').isEditable(), true);
+      await page.locator('#stdin').fill('7\n');
+      await finish(await begin());
+      assert.equal((await page.locator('#stdout').textContent()).trim(), '7');
+    });
     await check('数组求和：输入、数组格子、逐步与输出', async () => {
       await page.locator('#example').selectOption('array');
       assert.match(await page.locator('#stdin').inputValue(), /3 1 4 2/);
@@ -270,7 +292,7 @@ const results = [];
   } finally {
     await context.close();
     await browser.close();
-    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ status: results.length === 14 && !errors.length ? 'passed' : 'failed', checkedAt: new Date().toISOString(), browser: browser.version(), passed: results.length, checks: results, pageErrors: errors }, null, 2));
+    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ status: results.length === 15 && !errors.length ? 'passed' : 'failed', checkedAt: new Date().toISOString(), browser: browser.version(), passed: results.length, checks: results, pageErrors: errors }, null, 2));
   }
   console.log(`网页验收全部通过：${results.length} 项，截图：${output}`);
 })().catch((error) => { console.error(error); process.exitCode = 1; });
