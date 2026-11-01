@@ -4,17 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>代码实验台</title>
-  <link rel="stylesheet" href="site.css">
-  <link rel="stylesheet" href="lab.css">
-  <link rel="stylesheet" href="data-visuals.css">
-  <script src="syntax.js" defer></script>
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="features/execution/execution.css">
+  <link rel="stylesheet" href="features/editor/editor.css">
+  <link rel="stylesheet" href="features/variables/variables.css">
+  <link rel="stylesheet" href="features/data/data.css">
+  <link rel="stylesheet" href="features/io/io.css">
+  <link rel="stylesheet" href="features/history/history.css">
+  <link rel="stylesheet" href="features/data/access.css">
+  <script type="module" src="app.js"></script>
 </head>
 <body>
   <main class="lab">
     <header class="toolbar" aria-label="运行控制">
-      <label class="example-label"><span class="sr-only">课例</span><select id="example" aria-label="课例"><option value="swap">变量交换</option><option value="array">数组求和</option><option value="function">函数参数</option><option value="matrix">二维遍历</option><option value="prefix">前缀和</option><option value="containers">vector 与 string</option><option value="adjacent">相邻交换</option><option value="recursive">递归数组</option></select></label>
-      <button id="start">开始</button>
+      <label class="example-label"><span class="sr-only">课例</span><select id="example" aria-label="课例" disabled><option value="swap">正在载入课例…</option></select></label>
+      <button id="start" disabled>开始</button>
       <button id="next" class="primary" disabled>下一步</button>
       <button id="play" disabled>▶ 播放</button>
       <button id="pause" disabled hidden>Ⅱ 暂停</button>
@@ -41,28 +47,29 @@
         <pre id="code-view" class="code-view" tabindex="0" aria-label="代码执行位置" hidden></pre>
       </section>
       <div id="code-splitter" class="splitter vertical-splitter" role="separator" aria-label="调整代码宽度" aria-orientation="vertical" tabindex="0"></div>
-      <div class="inspector">
-        <div class="state-grid">
+      <div class="state-grid">
           <section class="panel variables-panel" aria-labelledby="variables-title">
-            <div class="panel-head"><h2 id="variables-title">变量</h2><span id="frame">—</span><details class="stack"><summary>调用栈 <span id="frame-count">0 层</span></summary><ol id="frames"></ol></details></div>
+            <div class="panel-head"><h2 id="variables-title">变量</h2><div class="variable-columns" role="group" aria-label="每行变量数量"><button id="variables-one" type="button" aria-pressed="true">单列</button><button id="variables-two" type="button" aria-pressed="false">双列</button></div></div>
+            <div class="variable-context"><span id="frame">—</span><details class="stack"><summary>调用栈 <span id="frame-count">0 层</span></summary><ol id="frames"></ol></details></div>
             <div class="variables-body">
               <section class="locals-section"><h3>当前调用</h3><div class="variable-scroll"><table><thead><tr><th>变量</th><th>值</th><th>上一步</th></tr></thead><tbody id="locals"><tr><td colspan="3" class="empty">—</td></tr></tbody></table></div></section>
+              <section id="frame-variables" hidden><h3>所选调用帧</h3><div class="variable-scroll"><table><thead><tr><th>变量</th><th>值</th><th>上一步</th></tr></thead><tbody id="frame-locals"></tbody></table></div></section>
               <section id="globals-section"><h3>全局</h3><div class="variable-scroll"><table><thead><tr><th>变量</th><th>值</th><th>上一步</th></tr></thead><tbody id="globals"><tr><td colspan="3" class="empty">—</td></tr></tbody></table></div></section>
             </div>
           </section>
-          <div id="variables-splitter" class="splitter horizontal-splitter" role="separator" aria-label="调整变量与数组区域高度" aria-orientation="horizontal" tabindex="0"></div>
+          <div id="variables-splitter" class="splitter vertical-splitter" role="separator" aria-label="调整变量区域宽度" aria-orientation="vertical" tabindex="0"></div>
+          <div class="inspector">
           <section class="panel data-panel" aria-labelledby="data-title">
             <div class="panel-head"><h2 id="data-title">数组与容器</h2><select id="data-frame" aria-label="查看调用帧"></select></div>
             <div class="data-body">
-              <div id="frame-variables" hidden><h3>所选调用帧</h3><div class="variable-scroll"><table><thead><tr><th>变量</th><th>值</th><th>上一步</th></tr></thead><tbody id="frame-locals"></tbody></table></div></div>
               <div id="data-views" class="data-views"><p class="empty">—</p></div>
             </div>
           </section>
-        </div>
         <div id="io-splitter" class="splitter horizontal-splitter" role="separator" aria-label="调整输入输出高度" aria-orientation="horizontal" tabindex="0"></div>
         <div class="io-grid">
           <section class="panel input-panel"><div class="panel-head"><h2><label for="stdin">输入</label></h2><span id="input-hint" class="subtle">开始前填写</span></div><textarea id="stdin" aria-label="标准输入" spellcheck="false" placeholder="在开始前填写全部输入数据"></textarea><pre id="stdin-view" aria-label="输入读取位置" tabindex="0" hidden></pre></section>
           <section class="panel output-panel"><div class="panel-head"><h2>输出</h2></div><pre id="stdout" aria-label="标准输出" tabindex="0"></pre></section>
+        </div>
         </div>
       </div>
     </div>

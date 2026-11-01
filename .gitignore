@@ -12,13 +12,8 @@ node_modules/
 __pycache__/
 *.pyc
 *.log
-web/qa/
 探针/
 调研/
-运行器/artifacts/
-调试器/artifacts/
-运行器/.runner-state.json
-运行器/.runner-state.json.tmp
 
 # 本机身份、凭证和编辑器私有配置不进入公开仓库。
 .env
@@ -37,5 +32,3 @@ web/qa/
 *.obj
 *.o
 *.bundle
-web/result*.json
-调试器/result.json

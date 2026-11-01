@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "lessons": [
+    {
+      "id": "swap",
+      "title": "变量交换",
+      "file": "swap.json"
+    },
+    {
+      "id": "array",
+      "title": "数组求和",
+      "file": "array.json"
+    },
+    {
+      "id": "function",
+      "title": "函数参数",
+      "file": "function.json"
+    },
+    {
+      "id": "matrix",
+      "title": "二维遍历",
+      "file": "matrix.json"
+    },
+    {
+      "id": "prefix",
+      "title": "前缀和",
+      "file": "prefix.json"
+    },
+    {
+      "id": "containers",
+      "title": "vector 与 string",
+      "file": "containers.json"
+    },
+    {
+      "id": "adjacent",
+      "title": "相邻交换",
+      "file": "adjacent.json"
+    },
+    {
+      "id": "recursive",
+      "title": "递归数组",
+      "file": "recursive.json"
+    }
+  ]
+}

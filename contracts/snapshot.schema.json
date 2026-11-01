@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "代码实验台公共调试快照",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "step": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "line": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "status": {
+      "enum": [
+        "idle",
+        "starting",
+        "paused",
+        "completed",
+        "stopped",
+        "compile_error",
+        "runtime_error",
+        "timeout",
+        "output_limit",
+        "step_limit",
+        "error",
+        "closed"
+      ]
+    },
+    "reason": {
+      "type": [
+        "object",
+        "string",
+        "null"
+      ]
+    },
+    "motion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/frame"
+      }
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/variable"
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "stdout",
+        "stderr"
+      ]
+    },
+    "outputDelta": {
+      "type": "object",
+      "properties": {
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "stdout",
+        "stderr"
+      ]
+    },
+    "arrayAccess": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "reads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/access"
+          }
+        },
+        "writes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/access"
+          }
+        },
+        "uses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/access"
+          }
+        }
+      },
+      "required": [
+        "line",
+        "reads",
+        "writes"
+      ]
+    },
+    "inputTrace": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "ok",
+            "unavailable"
+          ]
+        },
+        "consumed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deltaStart": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deltaEnd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "state",
+        "consumed",
+        "deltaStart",
+        "deltaEnd"
+      ]
+    }
+  },
+  "required": [
+    "runId",
+    "step",
+    "line",
+    "status",
+    "frames",
+    "variables",
+    "output",
+    "outputDelta",
+    "arrayAccess"
+  ],
+  "$defs": {
+    "frame": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "function": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "user": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "key",
+        "level",
+        "function",
+        "line",
+        "user"
+      ]
+    },
+    "variable": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "frame": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "local",
+            "global",
+            "argument"
+          ]
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "uninitialized",
+            "unavailable",
+            "out_of_scope"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "previousValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/data"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type",
+        "kind",
+        "state",
+        "value",
+        "previousValue",
+        "changed",
+        "visible"
+      ]
+    },
+    "access": {
+      "type": "object",
+      "properties": {
+        "variableId": {
+          "type": "string"
+        },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "variableId",
+        "coordinates"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "array",
+            "matrix",
+            "vector",
+            "string"
+          ]
+        },
+        "shape": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "lowerBounds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "hidden": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "uninitialized",
+            "unavailable",
+            "out_of_scope"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/element"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "shape",
+        "lowerBounds",
+        "total",
+        "offset",
+        "limit",
+        "hidden",
+        "state",
+        "elements"
+      ]
+    },
+    "element": {
+      "type": "object",
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "uninitialized",
+            "unavailable",
+            "out_of_scope"
+          ]
+        },
+        "previousValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "added": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "index",
+        "coordinates",
+        "value",
+        "state"
+      ]
+    }
+  }
+}

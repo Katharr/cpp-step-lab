@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "code": "int main() {\n    int a = 1;  // a = 示例数值\n    return 0;\n}\n",
+  "input": "",
+  "display": {
+    "standard": "c++14",
+    "mode": "edit",
+    "dataSettings": []
+  }
+}

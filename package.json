@@ -4,12 +4,12 @@
   "private": true,
   "description": "本机 C++ 单步与数组可视化实验台",
   "scripts": {
-    "test:browser": "node web/browser-check.cjs",
-    "test:data": "node web/data-check.cjs",
-    "test:layout": "node web/layout-check.cjs",
-    "test:appearance": "node web/appearance-check.cjs",
-    "test:visual": "node web/data-visual-check.cjs && node web/access-check.cjs && node web/growth-check.cjs",
-    "test:delivery": "node delivery-check.cjs"
+    "test:browser": "node tests/browser/browser-check.cjs && node tests/browser/lesson-check.cjs",
+    "test:data": "node tests/browser/data-check.cjs",
+    "test:layout": "node tests/browser/layout-check.cjs",
+    "test:appearance": "node tests/browser/appearance-check.cjs",
+    "test:visual": "node tests/browser/data-visual-check.cjs && node tests/browser/access-check.cjs && node tests/browser/growth-check.cjs",
+    "test:delivery": "node tests/delivery/delivery-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.58.2",

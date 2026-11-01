@@ -1,0 +1,21 @@
+/* io 功能区域样式 */
+.io-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; min-width: 0; min-height: 0; }
+#stdin, #stdin-view, #stdout { flex: 1 1 0; width: 100%; min-height: 0; margin: 0; padding: 8px 10px; font: 18px/1.4 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; tab-size: 4; }
+#stdin { resize: none; }
+#stdin::placeholder { color: var(--muted); font-size: 14px; }
+.io-changed { background: #ffe6a4; color: #664300; box-shadow: 0 1px 0 #c89d3b; border-radius: 2px; }
+.io-consumed { color: var(--muted); opacity: .65; }
+.io-cursor { border-left: 2px solid var(--accent); margin-left: -2px; }
+.io-eof { display: inline-block; width: 2px; height: 1.15em; vertical-align: text-bottom; background: var(--accent); }
+.error-details { position: absolute; z-index: 6; right: 16px; bottom: 46px; width: min(560px, calc(100% - 32px)); max-height: 40%; overflow: auto; border: 1px solid #c98a77; border-radius: 6px; background: var(--surface); box-shadow: 0 4px 20px #0002; }
+.error-details summary { padding: 7px 10px; color: #a13e32; font-size: 13px; }
+#stderr { margin: 0; padding: 8px 10px; font: 14px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 800px) {
+.io-grid { gap: 4px; }
+}
+.input-panel { --panel-color: var(--region-input); --panel-soft: var(--region-input-soft); }
+.output-panel { --panel-color: var(--region-output); --panel-soft: var(--region-output-soft); }
+.input-panel .subtle { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.io-changed { color: var(--state-change); background: var(--state-change-soft); box-shadow: 0 2px 0 var(--state-change); }
+.error-details summary { color: var(--state-error); }
+.input-panel .subtle { font-size: 12px; }

@@ -1,21 +1,24 @@
-"""使用本项目环境运行已有的真实 GCC/GDB 自动验收。"""
-import subprocess
-import sys
+"""使用项目环境运行纯逻辑、真实 GCC/GDB、HTTP 与发布清单验收。"""
 from pathlib import Path
-
-from launch import configure
+import sys
+import unittest
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT))
+
+from code_lab.bootstrap import configure
+
+
+def main():
+    configure()
+    suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"), top_level_dir=str(ROOT))
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    return 0 if result.wasSuccessful() else 1
 
 
 if __name__ == "__main__":
-    configure()
-    for folder, script in ((".", "test_release.py"),
-                           ("调试器", "test_session.py"),
-                           ("调试器", "test_structures.py"),
-                           ("调试器", "test_growth.py"),
-                           ("调试器", "test_io_trace.py"),
-                           ("运行器", "test_web.py")):
-        result = subprocess.run([sys.executable, script], cwd=ROOT / folder)
-        if result.returncode:
-            raise SystemExit(result.returncode)
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+    raise SystemExit(main())

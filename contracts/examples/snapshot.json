@@ -1,0 +1,29 @@
+{
+  "runId": "example",
+  "step": 0,
+  "line": null,
+  "status": "completed",
+  "reason": "exited-normally",
+  "frames": [],
+  "variables": [],
+  "output": {
+    "stdout": "9007199254740993\n",
+    "stderr": ""
+  },
+  "outputDelta": {
+    "stdout": "9007199254740993\n",
+    "stderr": ""
+  },
+  "arrayAccess": {
+    "line": null,
+    "reads": [],
+    "writes": [],
+    "uses": []
+  },
+  "inputTrace": {
+    "state": "ok",
+    "consumed": 0,
+    "deltaStart": 0,
+    "deltaEnd": 0
+  }
+}

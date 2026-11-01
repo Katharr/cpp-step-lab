@@ -13,7 +13,7 @@
 ## 可以用它做什么
 
 - **逐步讲解执行过程**：下一步、进入函数、跳过函数，以及可调速度的播放与暂停。
-- **观察变量与调用帧**：显示局部变量、全局变量、前后值变化和递归调用中的独立状态。
+- **观察变量与调用帧**：变量竖栏与数组并排，支持单列／双列数值格子，显示局部变量、全局变量、前后值变化和递归调用中的独立状态。
 - **看清数组读写位置**：读取格子用蓝色强调，写入格子用橙色强调；写入相同数值也会标记目标。
 - **展示数组与容器**：支持一维、二维数组、`vector` 和 `string`，字符串可切换字符与编码显示。
 - **聚焦大数组中的有效信息**：按窗口读取元素，折叠连续相同值；本步读写位置保持展开，并自动定位到可见区域。
@@ -79,7 +79,7 @@ Python 环境统一放在根目录 `.venv`，依赖版本由 `requirements.txt` 
 | 需要了解 | 说明 |
 | --- | --- |
 | 代码位置 | 黄色箭头表示下一条待执行语句；变量和数组显示已经执行的状态。 |
-| 数组高亮 | 蓝色表示本步读取，橙色表示本步写入；历史回看还原当步标记。 |
+| 数组高亮 | 蓝色表示读取，橙色表示写入，紫色表示本步用作函数实参；历史回看还原当步标记。 |
 | 重复值折叠 | 叠片 `⋯` 格子可点击展开、再次点击收起；只折叠当前窗口内已读取的确定值。 |
 | 大数组 | 默认读取 50 个元素，窗口最多 200 个；不会一次读取整个大数组。 |
 | 未初始化值 | “待确认”和“未赋值”会明确标出，不能当成 0。 |
@@ -91,6 +91,7 @@ Python 环境统一放在根目录 `.venv`，依赖版本由 `requirements.txt` 
 
 - [老师使用说明](docs/代码实验台-老师使用说明.md)：课堂操作、窗口调整、变量状态与历史回看。
 - [故障处理](docs/代码实验台-故障处理.md)：环境、连接、端口占用与异常恢复。
+- [架构说明](docs/architecture.md)：目录边界、依赖方向和扩展方式。
 - [开发说明](docs/开发说明.md)：模块职责、接口与快照约定、测试和维护入口。
 - [项目文档索引](docs/README.md)：当前使用、故障处理、开发和发布说明。
 
@@ -133,26 +134,32 @@ npm run test:visual
 停止服务后执行：
 
 ```powershell
-& ./.venv/Scripts/python.exe build_release.py --output 发布/代码实验台-1.0.0-Windows-x64
+& ./.venv/Scripts/python.exe scripts/release/build.py --output 发布/代码实验台-1.0.0-Windows-x64
 # 对已经组装的默认发布目录，仅更新项目代码、文档和校验清单
-& ./.venv/Scripts/python.exe build_release.py --refresh
+& ./.venv/Scripts/python.exe scripts/release/build.py --refresh
 # 验收通过后生成 ZIP 和 SHA-256
-& ./.venv/Scripts/python.exe build_release.py --zip-only
+& ./.venv/Scripts/python.exe scripts/release/build.py --zip-only
 ```
 
 完整便携包包含 Python、GCC/GDB、离线依赖、课例、文档、第三方原有许可证和逐文件校验清单，可在准备好的 Windows x64 电脑上离线使用。
 
-发布前先关闭源码服务，执行 `& ./.venv/Scripts/python.exe verify_delivery.py` 检查发布包独立运行与清理；随后启动发布目录里的服务，执行 `npm run test:delivery` 完成断网浏览器演练。具体发布约定见 [发布说明](发布/README.md)。
+发布前先关闭源码服务，执行 `& ./.venv/Scripts/python.exe scripts/release/verify.py` 检查发布包独立运行与清理；随后启动发布目录里的服务，执行 `npm run test:delivery` 完成断网浏览器演练。具体发布约定见 [发布说明](发布/README.md)。
 
 ## 项目结构
 
 | 路径 | 用途 |
 | --- | --- |
-| `web/` | 网页、样式、交互与浏览器验收。 |
-| `运行器/` | 编译运行、HTTP 服务与会话接口。 |
-| `调试器/` | GDB 会话、变量快照、数组结构与读写位置识别。 |
-| `课例/` | 可直接载入的 JSON 教学课例。 |
-| `docs/` | 教师说明、故障处理、开发说明与效果图。 |
+| `src/code_lab/server/` | HTTP API、静态资源与页面会话管理。 |
+| `src/code_lab/execution/` | GCC 编译、工具链、子进程与清理。 |
+| `src/code_lab/debugger/` | 调试流程、GDB/MI 与独立 GDB Python 采集脚本。 |
+| `src/code_lab/snapshots/` | 语法事实、初始化证据、变量身份、访问识别与快照。 |
+| `web/` | 原生 ES modules；按执行、代码、变量、数组、I/O、历史、课例划分功能。 |
+| `课例/` | 内置教学内容的唯一来源；`index.json` 管理菜单顺序。 |
+| `contracts/` | 快照与课例 JSON Schema 及数据样例。 |
+| `tests/` | 单元、真实 GCC/GDB 与 HTTP、网页和交付验收，共用 C++ 样例。 |
+| `scripts/release/` | 发布构建与独立运行验收入口。 |
+| `docs/` | 教师说明、故障处理、架构、接口与开发说明。 |
+| `.local/`、`验收输出/` | 本机状态、诊断、验收报告与截图，不提交。 |
 | `runtime/`、`wheelhouse/`、`发布/` | 本机运行环境与便携包产物，大体积内容由 Git 忽略。 |
 
 所有运行资源、依赖清单与脚本都由本项目管理，路径以脚本所在目录为基准。文档在本仓库维护；第三方代码及依赖保留并遵循各自许可证。

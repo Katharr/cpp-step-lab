@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "代码实验台版本 1 课例",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "string"
+    },
+    "display": {
+      "type": "object",
+      "properties": {
+        "standard": {
+          "enum": [
+            "c++11",
+            "c++14"
+          ]
+        },
+        "example": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "edit",
+            "view"
+          ]
+        },
+        "dataSettings": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "layout": {
+          "type": "object"
+        }
+      },
+      "required": []
+    }
+  },
+  "required": [
+    "version",
+    "code",
+    "input",
+    "display"
+  ]
+}
