@@ -8,7 +8,7 @@
     "test:data": "node web/data-check.cjs",
     "test:layout": "node web/layout-check.cjs",
     "test:appearance": "node web/appearance-check.cjs",
-    "test:visual": "node web/data-visual-check.cjs && node web/access-check.cjs",
+    "test:visual": "node web/data-visual-check.cjs && node web/access-check.cjs && node web/growth-check.cjs",
     "test:delivery": "node delivery-check.cjs"
   },
   "devDependencies": {

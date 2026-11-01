@@ -13,6 +13,7 @@ if __name__ == "__main__":
     for folder, script in ((".", "test_release.py"),
                            ("调试器", "test_session.py"),
                            ("调试器", "test_structures.py"),
+                           ("调试器", "test_growth.py"),
                            ("调试器", "test_io_trace.py"),
                            ("运行器", "test_web.py")):
         result = subprocess.run([sys.executable, script], cwd=ROOT / folder)

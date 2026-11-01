@@ -12,12 +12,20 @@ def normalize_data(item, old):
     if not data:
         return
     item["dataKey"] = item["rawId"]
+    old_data = (old or {}).get("data") or {}
     before = {tuple(element["coordinates"]): element
-              for element in ((old or {}).get("data") or {}).get("elements", [])}
+              for element in old_data.get("elements", [])}
+    comparable_length = (old is not None and old["state"] == item["state"] == "ok"
+                         and old_data.get("state") == data["state"] == "ok"
+                         and data["kind"] in ("vector", "string")
+                         and old_data.get("kind") == data["kind"])
     for element in data["elements"]:
         if item["state"] != "ok":
             element.update(state=item["state"], value=None, note=item["note"])
         prior = before.get(tuple(element["coordinates"]))
+        # 旧窗口未读取不等于旧元素不存在；仅用已确认的旧长度判断新增。
+        element["added"] = bool(comparable_length and element["state"] == "ok"
+                                and old_data["total"] <= element["index"] < data["total"])
         element["changed"] = bool(prior and prior["state"] == element["state"] == "ok"
                                   and prior["value"] != element["value"])
         element["previousValue"] = prior["value"] if element["changed"] else None

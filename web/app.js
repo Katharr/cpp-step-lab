@@ -976,7 +976,7 @@ int main() {
     for (const element of data.elements) {
       const prior = priorElements.get(element.coordinates.join(','));
       const confirmed = (prior || priorVariable?.state !== 'ok') && becameKnown(element, prior);
-      const cell = node('div', undefined, 'element' + (element.changed || confirmed ? ' changed' : '') + (element.state !== 'ok' ? ' unknown' : ''));
+      const cell = node('div', undefined, 'element' + (element.changed || element.added || confirmed ? ' changed' : '') + (element.state !== 'ok' ? ' unknown' : ''));
       if (isNumericArrayZero(variable, element)) cell.classList.add('zero-value');
       cell.dataset.index = element.index; cell.dataset.coordinates = element.coordinates.join(',');
       cell.dataset.variableId = variable.id;
@@ -1003,7 +1003,8 @@ int main() {
       }
       if (element.note) cell.title = element.note;
       if (element.state !== 'ok' && element.note?.startsWith('读取失败')) cell.querySelector('.element-value').textContent = '读取失败';
-      if (element.changed) cell.title = `上一步：${element.previousValue}；当前：${element.value}`;
+      if (element.added) cell.title = `本步新增；当前：${element.value}`;
+      else if (element.changed) cell.title = `上一步：${element.previousValue}；当前：${element.value}`;
       else if (confirmed) cell.title = `${valueText(prior)} → ${element.value}`;
       if (data.kind === 'matrix') { cell.style.gridRow = rowTracks.indexOf(element.coordinates[0]) + 2; cell.style.gridColumn = columnTracks.indexOf(element.coordinates[1]) + 2; }
       rendered.push({ element, cell });
