@@ -52,7 +52,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   }
   async function edit(code) {
     if (await page.$eval('#stop', (el) => !el.disabled)) await action('stop');
-    await page.click('#edit');
+
     await page.$eval('#source', (el, code) => { el.value = code; el.dispatchEvent(new Event('input')); }, code);
     return action('start', '/api/start');
   }

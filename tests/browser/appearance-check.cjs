@@ -231,15 +231,15 @@ const errors = [];
       for (const name of ['light', 'dark', 'dracula']) {
         await theme(name);
         assert.equal(await page.locator('#source').inputValue(), syntaxSource);
-        colors.push(await page.locator('#code-view .token-number').first().evaluate((token) => getComputedStyle(token).color));
+        colors.push(await page.locator('#edit-highlight .token-number').first().evaluate((token) => getComputedStyle(token).color));
         await page.locator('#history-prev').click();
         assert.equal(await page.locator('html').getAttribute('data-code-theme'), name);
         assert.match(await page.locator('#history-state').textContent(), /回看/);
         await page.locator('#history-latest').click();
       }
       assert.equal(new Set(colors).size, 3);
-      assert.equal(await page.locator('#code-view img, #code-view script').count(), 0);
-      assert.ok((await page.locator('#code-view').textContent()).includes('9007199254740993'));
+      assert.equal(await page.locator('#edit-highlight img, #edit-highlight script').count(), 0);
+      assert.ok((await page.locator('#edit-highlight').textContent()).includes('9007199254740993'));
       await page.screenshot({ path: path.join(output, 'execution-dracula.png') });
       await action('stop');
       await page.reload();
@@ -310,7 +310,7 @@ const errors = [];
       await action('stop');
     });
     await check('真实 GCC/GDB：待确认与未赋值经输入、复制后都有变化高亮', async () => {
-      await page.locator('#edit').click();
+
       await theme('light');
       await page.locator('#variables-splitter').press('Shift+ArrowRight');
       await page.locator('#source').fill('#include <iostream>\nint main() {\n    int n; // n：输入的数\n    int s = 0; // s：执行位置标记\n    int q; // q：输入值的副本\n    s = 1;\n    std::cin >> n;\n    q = n;\n    std::cout << q << std::endl;\n    return 0;\n}\n');

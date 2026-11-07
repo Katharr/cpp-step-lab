@@ -36,7 +36,7 @@ const onlyMock = process.argv.includes('--mock');
         const rect = document.querySelector(selector).getBoundingClientRect();
         return { selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
       });
-      const code = document.querySelector(document.querySelector('#code-view').hidden ? '#source' : '#code-view');
+      const code = document.querySelector('#source');
       const style = getComputedStyle(code);
       const usableHeight = code.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
       return {
@@ -167,7 +167,7 @@ const onlyMock = process.argv.includes('--mock');
         assert.ok(longValue.contentRight <= longValue.cardRight + 1 && longValue.rowBottom <= longValue.neighborTop + 1, '长值区域应限定在列表内，不得覆盖相邻变量');
         assert.equal(longValue.overflow, 'auto');
         assert.ok(longValue.scrollable && longValue.moved, '长值应能在列表内部横滚查看：' + JSON.stringify(longValue));
-        for (const selector of ['#code-view', '#locals .current-value', '[data-structure="a"] .element', '#stdin-view', '#stdout']) {
+        for (const selector of ['#edit-highlight', '#locals .current-value', '[data-structure="a"] .element', '#stdin-view', '#stdout']) {
           assert.equal(await page.locator(selector).first().isVisible(), true, selector);
         }
         await page.screenshot({ path: path.join(output, `${size.width}x${size.height}.png`) });
@@ -308,11 +308,12 @@ const onlyMock = process.argv.includes('--mock');
       assert.equal(await page.locator('#io-splitter').getAttribute('aria-valuenow'), '80');
       assert.equal(await page.locator('#variables-splitter').getAttribute('aria-valuenow'), '288');
       assert.equal(await page.locator('#variables-two').getAttribute('aria-pressed'), 'true');
-      const legacy = { ...saved, display: { ...saved.display, layout: { codeWidth: 40, stateHeight: 76, variablesHeight: 180 } } };
+      const legacy = { ...saved, display: { ...saved.display, mode: 'view', layout: { codeWidth: 40, stateHeight: 76, variablesHeight: 180 } } };
       await page.locator('#case-file').setInputFiles({ name: '旧课例.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
       await page.waitForFunction(() => document.querySelector('#variables-one').getAttribute('aria-pressed') === 'true');
       assert.equal(await page.locator('#variables-splitter').getAttribute('aria-valuenow'), '200', '旧高度不能作为新栏宽');
       assert.equal(await page.locator('#source').inputValue(), source);
+      assert.equal(await page.locator('#source').isEditable(), true, '旧课例的 view 模式不能阻止默认编辑');
       assert.equal(await page.locator('#stdin').inputValue(), input);
       await page.locator('#variables-splitter').dblclick();
       await page.locator('#variables-one').click();
@@ -332,7 +333,7 @@ const onlyMock = process.argv.includes('--mock');
         if (endpoint === '/api/start') step = 0;
         if (endpoint === '/api/command') step++;
         await route.fulfill({ json: endpoint === '/api/health' ? { status: 'ready' } : {
-          runId: 'strip-fixture', status: stopped ? 'stopped' : 'paused', step, line: step + 1, frames: [{ id: 'f0', level: 0, function: 'main', user: true }], output: {},
+          runId: 'strip-fixture', status: stopped ? 'stopped' : 'paused', motion: stopped ? 'stop' : step ? 'next' : null, step, line: step + 1, frames: [{ id: 'f0', level: 0, function: 'main', user: true }], output: {},
           variables: [{ id: 'i', name: 'i', type: 'int', value: '0', state: 'ok', visible: true, kind: 'local', frame: 0 }, strip('a'), strip('b')]
         } });
       });
@@ -388,7 +389,7 @@ const onlyMock = process.argv.includes('--mock');
         window.__feedbackCalls = [];
         window.__originalAnimate = Element.prototype.animate;
         Element.prototype.animate = function (...args) {
-          window.__feedbackCalls.push({ value: this.matches('.element-value') && Boolean(this.closest('.changed')), code: Boolean(this.closest('.code-line.current')) });
+          window.__feedbackCalls.push({ value: this.matches('.element-value') && Boolean(this.closest('.changed')), code: Boolean(this.closest('.code-line.executed')) });
           return window.__originalAnimate.apply(this, args);
         };
       });
@@ -396,7 +397,7 @@ const onlyMock = process.argv.includes('--mock');
         await action('next');
         const feedback = await page.evaluate(() => window.__feedbackCalls);
         assert.ok(feedback.some((call) => call.value), '标准模式单步必须触发真实变化格的动画');
-        assert.ok(feedback.some((call) => call.code), '标准模式必须反馈下一条执行位置');
+        assert.ok(feedback.some((call) => call.code), '标准模式必须反馈刚执行的代码');
       } finally {
         await page.evaluate(() => { Element.prototype.animate = window.__originalAnimate; delete window.__originalAnimate; delete window.__feedbackCalls; });
       }

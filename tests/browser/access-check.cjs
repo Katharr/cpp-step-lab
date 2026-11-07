@@ -86,7 +86,7 @@ int main() {
     result = await until((snapshot) => snapshot.status === 'completed', result);
     assert.equal(result.output.stdout.trim(), '3 1');
     // 相同数值仍须逐个标出真正读取的下标；不依赖下标手工绑定。
-    await page.locator('#edit').click();
+
     await page.locator('#source').fill(`#include <iostream>
 #include <cstdio>
 using namespace std;
@@ -138,7 +138,7 @@ int main() {
     assert.equal(await page.locator('#stdout').textContent(), '0');
     // 用户程序：条件判断必读 b[i]，正数、负数和零都应标出一次。
     await page.locator('#history-latest').click();
-    await page.locator('#edit').click();
+
     const accumulation = `#include<bits/stdc++.h>
 using namespace std;
 int a[100005], b[100005]; // a：输入数组；b：前缀和
@@ -162,7 +162,7 @@ int main() {
     for (const functionCall of [false, true]) {
       if (functionCall) {
         await page.locator('#history-latest').click();
-        await page.locator('#edit').click();
+
       }
       await page.locator('#source').fill(functionCall ? accumulation.replace('b[i]>0 ? b[i] : (-1)*b[i]', 'abs(b[i])') : accumulation);
       await page.locator('#stdin').fill('6\n3 -5 2 0 4 -9\n');
@@ -208,7 +208,7 @@ int main() {
     }
     // 通用调用：不同函数与嵌套调用均走同一规则，零值离窗元素也不能被折叠。
     await page.locator('#history-latest').click();
-    await page.locator('#edit').click();
+
     await page.locator('#source').fill(`#include<bits/stdc++.h>
 using namespace std;
 int f(int x) { // x：参数
@@ -250,7 +250,7 @@ int main() {
     assert.equal(result.status, 'completed');
     assert.deepEqual(functionUses, [[60], [60,61], [61], [61,62], [62], [62,63]]);
     // if 比较的真假路径都读取 a[j]；零值离窗格子要展开并保留历史标记。
-    await page.locator('#edit').click();
+
     const comparison = `#include <iostream>
 int a[100] = {}; // a：待比较数组
 int main() {

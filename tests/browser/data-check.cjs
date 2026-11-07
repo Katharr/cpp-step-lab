@@ -127,7 +127,7 @@ const checks = [];
     await check('字符串长度：空输入与非空输入、声明执行后显示及历史回看', async () => {
       for (const [input, expected] of [['', ['0', '0']], ['12345 678\n', ['5', '3']]]) {
         if (await page.locator('#stop').isEnabled()) await action('stop');
-        await page.locator('#edit').click();
+
         await page.locator('#source').fill(`#include <iostream>
 #include <string>
 int main() {
@@ -163,7 +163,7 @@ int main() {
     });
     await check('max/min：初始化、嵌套赋值与历史回看显示确定数值', async () => {
       if (await page.locator('#stop').isEnabled()) await action('stop');
-      await page.locator('#edit').click();
+
       await page.locator('#source').fill(fs.readFileSync(path.join(__dirname, '../fixtures/cpp/min_max.cpp'), 'utf8'));
       await page.locator('#stdin').fill('');
       let s = await action('start', '/api/start');
@@ -183,7 +183,7 @@ int main() {
     });
     await check('信奥常用函数：数学、字符串、STL、位运算和类型转换返回值', async () => {
       if (await page.locator('#stop').isEnabled()) await action('stop');
-      await page.locator('#edit').click();
+
       const source = fs.readFileSync(path.join(__dirname, '../fixtures/cpp/common_functions.cpp'), 'utf8');
       await page.locator('#source').fill(source);
       await page.locator('#stdin').fill('');
@@ -201,7 +201,7 @@ int main() {
     });
     await check('窗口最大和：数组初始化与区间和赋值后 mx 显示、变化及历史回看', async () => {
       if (await page.locator('#stop').isEnabled()) await action('stop');
-      await page.locator('#edit').click();
+
       await page.locator('#source').fill(fs.readFileSync(path.join(__dirname, '../fixtures/cpp/window_max.cpp'), 'utf8'));
       await page.locator('#stdin').fill('5 2\n3 1 4 2 5\n');
       let s = await action('start', '/api/start');
@@ -240,7 +240,7 @@ int main() {
       await finish(s, '4 1');
     });
     await check('百万数组：默认 50 格、窗口跳转不执行、隐藏数与窄屏', async () => {
-      await page.locator('#edit').click();
+
       await page.locator('#source').fill('int a[1000000] = {};\nint main() {\n a[999999] = 7;\n return 0;\n}\n');
       const s = await action('start', '/api/start');
       assert.equal(s.variables.find((variable) => variable.name === 'a').data.elements.length, 50);
