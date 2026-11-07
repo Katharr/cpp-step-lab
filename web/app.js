@@ -39,14 +39,6 @@ $('pause').addEventListener('click', () => {
   if (state.busy) notice('已暂停播放，当前这一步完成后停下。需要立即中断时请点击“停止”。');
 });
 $('stop').addEventListener('click', actions.stop);
-$('edit').addEventListener('click', () => {
-  actions.mode(true);
-  $('source').focus();
-});
-$('view').addEventListener('click', () => {
-  actions.mode(false);
-  actions.renderCode();
-});
 $('source').addEventListener('input', actions.edited);
 $('stdin').addEventListener('input', actions.edited);
 $('standard').addEventListener('change', actions.edited);
@@ -120,6 +112,7 @@ setInterval(() => {
 actions.setupCodeTheme();
 actions.setupMotion();
 actions.setupLayout();
+new ResizeObserver(actions.syncEditorScroll).observe($('source').parentElement);
 actions.controls();
 await actions.setupExamples();
 await actions.connect();

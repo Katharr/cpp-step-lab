@@ -35,6 +35,7 @@ export function createLessons({
         actions.render();
         return;
       }
+      state.lessonLoading = false;
       await loadExample();
     } catch (error) {
       state.lessonLoading = false;
@@ -44,7 +45,7 @@ export function createLessons({
   }
   async function loadExample() {
     const lesson = catalog.find(item => item.id === $('example').value);
-    if (!lesson) return;
+    if (!lesson || actions.codeLockReason()) return;
     const version = ++loadRevision;
     const editorRevision = state.editorRevision;
     state.lessonLoading = true;
@@ -70,7 +71,6 @@ export function createLessons({
       standard: $('standard').value,
       codeTheme: $('code-theme').value,
       example: $('example').value,
-      mode: $('editor').hidden ? 'view' : 'edit',
       layout: {
         ...state.layout
       },
@@ -125,6 +125,7 @@ export function createLessons({
     fromBuiltin = false
   } = {}) {
     validateCase(data);
+    if (!fromBuiltin && actions.codeLockReason()) throw new Error(actions.codeLockReason());
     if (!fromBuiltin) cancelLessonLoad();
     ++state.editorRevision;
     $('source').value = data.code;
@@ -156,11 +157,19 @@ export function createLessons({
     state.errorLines = [];
     actions.compilerInfo(null);
     actions.render();
-    actions.mode(display.mode !== 'view');
     notice('课例已载入');
   }
   async function loadCaseFile(file) {
     if (!file) return;
+    if (actions.codeLockReason()) {
+      notice(actions.codeLockReason());
+      $('case-file').value = '';
+      return;
+    }
+    const version = ++loadRevision;
+    const editorRevision = state.editorRevision;
+    state.lessonLoading = true;
+    actions.controls();
     try {
       let data;
       try {
@@ -168,10 +177,16 @@ export function createLessons({
       } catch {
         throw new Error('课例文件不是有效的 JSON。');
       }
+      if (version !== loadRevision || editorRevision !== state.editorRevision) return;
+      state.lessonLoading = false;
       applyCase(data);
     } catch (error) {
-      notice(error.message || '课例文件无法载入。');
+      if (version === loadRevision) notice(error.message || '课例文件无法载入。');
     } finally {
+      if (version === loadRevision) {
+        state.lessonLoading = false;
+        actions.controls();
+      }
       $('case-file').value = '';
     }
   }

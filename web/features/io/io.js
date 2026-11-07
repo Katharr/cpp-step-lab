@@ -25,8 +25,8 @@ export function createIO({
     const view = $('stdin-view');
     if (!view) return;
     // 最新运行结束后直接恢复输入；回看历史时仍展示当步读取轨迹。
-    const running = Boolean(state.snapshot) && $('editor').hidden && (state.snapshot.status === 'paused' || state.historyIndex < state.history.length - 1);
-    $('input-hint').textContent = running ? '本次输入 · 重新运行前可修改' : '开始前填写';
+    const running = Boolean(state.snapshot) && (state.liveSnapshot?.status === 'paused' || state.historyIndex < state.history.length - 1);
+    $('input-hint').textContent = running ? '本次输入 · 停止后可修改' : '开始前填写';
     view.hidden = !running;
     $('stdin').hidden = running;
     if (!running) return;

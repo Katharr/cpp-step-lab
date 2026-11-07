@@ -18,7 +18,7 @@ export function createExecution({
   client
 }) {
   function controls() {
-    const active = state.snapshot?.status === 'paused' && !state.uncertain;
+    const active = state.liveSnapshot?.status === 'paused' && !state.uncertain;
     const atLatest = state.historyIndex < 0 || state.historyIndex === state.history.length - 1;
     const locked = state.busy || state.stopping || state.lessonLoading;
     $('start').disabled = locked || active;
@@ -28,10 +28,15 @@ export function createExecution({
     $('play').hidden = state.playing;
     $('pause').hidden = !state.playing;
     $('stop').disabled = !active || state.starting || state.stopping;
-    for (const id of ['example', 'standard', 'edit']) $(id).disabled = active || locked || state.playing || state.historyIndex < state.history.length - 1;
-    $('source').readOnly = active || locked;
-    $('stdin').readOnly = active || locked;
-    for (const id of ['save-case', 'load-case', 'restore-case']) $(id).disabled = state.lessonLoading;
+    const lockReason = actions.codeLockReason();
+    for (const id of ['example', 'standard', 'load-case', 'restore-case', 'case-file']) $(id).disabled = Boolean(lockReason);
+    $('save-case').disabled = state.lessonLoading;
+    $('source').readOnly = $('stdin').readOnly = Boolean(lockReason);
+    $('editor').classList.toggle('locked', Boolean(lockReason));
+    $('source').title = lockReason;
+    $('editor-lock').textContent = lockReason ? '🔒 ' + lockReason : '可编辑';
+    $('editor-lock').title = lockReason;
+    actions.renderInput();
     for (const control of document.querySelectorAll('.window-controls input, .window-controls button')) control.disabled = !active || !atLatest || locked || state.playing;
     $('reconnect').disabled = locked;
     if (state.starting) $('status').textContent = '正在编译与启动…';else if (state.stopping) $('status').textContent = '正在停止…';else if (state.playing) $('status').textContent = '正在播放';else if (state.historyIndex >= 0 && state.historyIndex < state.history.length - 1) $('status').textContent = '正在回看';else if (state.busy) $('status').textContent = '正在执行…';else if (state.uncertain) $('status').textContent = '连接中断';else $('status').textContent = statusText[state.snapshot?.status || 'idle'] || '操作未完成';
@@ -61,7 +66,7 @@ export function createExecution({
   }
   async function receive(result) {
     if (!Number.isInteger(result.step)) {
-      if (result.status === 'stale' || result.status === 'invalid_state') state.uncertain = true;
+      if (result.status !== 'command_error') state.uncertain = true;
       pause();
       notice(result.status === 'command_error' ? '此处无法执行该操作，请使用“下一步”或“跳过函数”。' : result.error || '操作未完成，请重新运行。');
       return;
@@ -82,7 +87,6 @@ export function createExecution({
     actions.remember(result);
     state.uncertain = Boolean(restoreError?.disconnected);
     if (result.status !== 'paused') pause();
-    actions.mode(false);
     actions.render({
       animate: true
     });
@@ -123,7 +127,6 @@ export function createExecution({
     notice();
     actions.render();
     actions.compilerInfo(null);
-    actions.mode(false);
     try {
       const result = await client.request('/api/start', {
         sessionId: client.sessionId,
@@ -134,7 +137,7 @@ export function createExecution({
       if (version === state.revision) await receive(result);
     } catch (error) {
       notice(error.message);
-      if (error.disconnected) state.uncertain = true;
+      state.uncertain = true;
     } finally {
       state.busy = state.starting = false;
       controls();

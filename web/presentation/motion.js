@@ -55,7 +55,7 @@ export function createMotion({
     const completed = state.snapshot.status === 'completed' && completedFeedbackRun !== state.snapshot.runId;
     if (completed) completedFeedbackRun = state.snapshot.runId;
     if (document.documentElement.dataset.motion !== 'standard' || state.playing && Number($('speed').value) <= 300) return;
-    animateFeedback($('code-view').querySelector('.current .line-text'), [{
+    animateFeedback($('edit-highlight').querySelector('.executed .line-text'), [{
       opacity: .45
     }, {
       opacity: 1

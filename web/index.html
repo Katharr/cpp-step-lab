@@ -42,9 +42,8 @@
     <div id="notice" class="notice" role="alert" hidden><span id="notice-message"></span><button id="dismiss-notice" type="button" aria-label="关闭提示">×</button></div>
     <div class="workspace">
       <section class="panel source-panel" aria-labelledby="source-title">
-        <div class="panel-head"><h2 id="source-title">代码</h2><div class="view-tabs"><button id="edit" aria-pressed="true">编辑</button><button id="view" aria-pressed="false">执行</button></div><span id="line-hint" hidden></span></div>
-        <div id="editor" class="editor"><pre id="edit-lines" aria-hidden="true">1</pre><div class="source-wrap"><pre id="edit-highlight" aria-hidden="true"></pre><textarea id="source" aria-label="C++ 代码" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off"></textarea></div></div>
-        <pre id="code-view" class="code-view" tabindex="0" aria-label="代码执行位置" hidden></pre>
+        <div class="panel-head"><h2 id="source-title">代码</h2><span id="editor-lock" class="editor-lock" role="status">可编辑</span><span id="line-hint" class="line-hint"></span></div>
+        <div id="editor" class="editor"><pre id="edit-lines" aria-hidden="true">1</pre><div class="source-wrap"><pre id="edit-highlight" aria-hidden="true"></pre><textarea id="source" aria-label="C++ 代码" aria-describedby="editor-lock line-hint" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off"></textarea></div></div>
       </section>
       <div id="code-splitter" class="splitter vertical-splitter" role="separator" aria-label="调整代码宽度" aria-orientation="vertical" tabindex="0"></div>
       <div class="state-grid">
@@ -74,7 +73,7 @@
       </div>
     </div>
     <div class="history-bar" aria-label="历史回看">
-      <span class="state-legend" aria-label="状态图例"><span>➜ 下一条</span><span>◆ 本步变化</span></span>
+      <span class="state-legend" aria-label="状态图例"><span>● 刚执行</span><span>➜ 下一条</span><span>◆ 本步变化</span></span>
       <strong id="history-state">执行历史</strong>
       <button id="history-prev" disabled aria-label="历史上一步" title="历史上一步">◀</button>
       <button id="history-next" disabled aria-label="历史下一步" title="历史下一步">▶</button>

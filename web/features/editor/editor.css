@@ -1,61 +1,48 @@
-/* editor 功能区域样式 */
-.view-tabs { display: flex; gap: 5px; margin-left: auto; }
-.view-tabs button { font-size: 12px; padding: 2px 8px; }
-.view-tabs button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.editor, .code-view { flex: 1 1 0; min-height: 0; background: var(--code-bg); font: 20px/24px var(--font-mono); tab-size: 4; }
-.editor { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); overflow: hidden; }
-#edit-lines { margin: 0; padding: 8px 10px; color: var(--muted); background: var(--surface-2); text-align: right; overflow: hidden; user-select: none; font: inherit; }
-#source { margin: 0; padding: 8px 10px; width: 100%; height: 100%; min-height: 0; resize: none; overflow: auto; white-space: pre; font: inherit; background: transparent; tab-size: 4; border-radius: 0; }
-.code-view { margin: 0; padding: 8px 0; overflow: auto; }
-.code-line { display: flex; min-width: 100%; width: max-content; }
-.line-number { flex: 0 0 3.2em; width: 3.2em; color: var(--muted); text-align: right; padding-right: 10px; user-select: none; }
-.line-text { padding: 0 10px; white-space: pre; }
-.code-line.executed { box-shadow: inset 3px 0 #719c78; background: #719c7812; }
-.code-line.executed .line-number { color: #4b7954; }
-.code-line.current { background: var(--accent-soft); box-shadow: inset 4px 0 var(--accent); }
-.code-line.current .line-number { color: var(--accent); font-weight: 700; }
-.code-line.compile-error { background: #fff0ed; box-shadow: inset 4px 0 #b74b39; }
-.diagnostics { position: absolute; z-index: 7; left: 16px; bottom: 46px; width: min(760px, calc(100% - 32px)); max-height: 45%; box-shadow: 0 4px 20px #0002; }
+/* 同一代码区：textarea 始终负责选择、复制与编辑，高亮层不接收鼠标事件。 */
+.editor { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: 3.2em minmax(0, 1fr); overflow: hidden; font: 20px/24px var(--font-mono); tab-size: 4; color: var(--code-text); background: var(--code-bg); }
+#edit-lines { margin: 0; padding: 8px 0; color: var(--code-muted); background: var(--code-gutter); text-align: right; overflow: hidden; user-select: none; font: inherit; }
+.line-number { display: inline-block; position: relative; width: 100%; height: 24px; padding-right: 10px; }
+.source-wrap { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+#source, #edit-highlight { margin: 0; padding: 8px 10px; font: inherit; white-space: pre; tab-size: 4; border: 0; border-radius: 0; }
+#source { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; min-height: 0; resize: none; overflow: auto; background: transparent; color: var(--code-text); caret-color: var(--code-text); }
+#edit-highlight { position: absolute; inset: 0; overflow: hidden; pointer-events: none; user-select: none; color: var(--code-text); }
+html.syntax-ready #source { color: transparent; -webkit-text-fill-color: transparent; }
+#source::selection { background: var(--code-selection); }
+.code-lines { display: block; width: max-content; min-width: 100%; }
+.code-line { display: inline-block; vertical-align: top; min-width: 100%; width: max-content; height: 24px; }
+/* 下一条只用轻量侧线和行号箭头，主底色留给刚执行的代码。 */
+.code-line.current { box-shadow: inset 2px 0 var(--code-next-text); }
+.line-number.current { color: var(--code-next-text); }
+.line-number.current::before { content: '➜'; position: absolute; left: 2px; font-size: 14px; }
+.code-line.executed { background: var(--code-executed-bg); box-shadow: inset 5px 0 var(--code-executed-mark); }
+.line-number.executed { color: var(--code-executed-mark); background: var(--code-executed-bg); font-weight: 700; }
+.line-number.executed::before { content: '●'; position: absolute; left: 3px; font-size: 12px; }
+.line-number.executed.current::before { content: '➜'; font-size: 14px; }
+.code-line.compile-error { background: var(--code-error-bg); box-shadow: inset 4px 0 var(--state-error); }
+.line-number.compile-error { color: var(--state-error); }
+.editor.locked #source { cursor: not-allowed; caret-color: transparent; }
+.editor-lock { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.line-hint { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #805100; }
+.diagnostics { position: absolute; z-index: 7; left: 16px; bottom: 46px; width: min(760px, calc(100% - 32px)); max-height: 45%; --panel-color: var(--state-error); --panel-soft: var(--state-error-soft); }
 #diagnostic-links { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 0; }
 #diagnostic-links button { font-size: 12px; }
 #compiler-output { margin: 0; padding: 8px 10px; min-height: 0; overflow: auto; font: 13px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 #dismiss-diagnostics { padding: 0 7px; color: var(--muted); border: 0; font-size: 20px; }
-.diagnostics { --panel-color: var(--state-error); --panel-soft: var(--state-error-soft); }
-.view-tabs button { box-shadow: none; }
-.code-line.current { background: var(--state-next-soft); box-shadow: inset 4px 0 var(--state-next); }
-.code-line.current .line-number { position: relative; color: var(--state-next); }
-.code-line.current .line-number::before { content: '➜'; position: absolute; left: 4px; }
-.code-line.executed { background: transparent; box-shadow: inset 3px 0 var(--state-success); }
-.code-line.executed .line-number { color: var(--state-success); }
-.code-line.executed.current { background: var(--state-next-soft); box-shadow: inset 4px 0 var(--state-next); }
-.code-line.compile-error { background: var(--state-error-soft); box-shadow: inset 4px 0 var(--state-error); }
 html[data-code-theme='light'] {
   --code-bg: #ffffff; --code-text: #202020; --code-gutter: #f5f5f5; --code-muted: #626262;
-  --code-selection: #add6ff80; --code-next-bg: #fffef6; --code-next-text: #805100; --code-error-bg: #fff0f2;
+  --code-selection: #add6ff80; --code-next-bg: #fffef6; --code-executed-bg: #ffe2a3; --code-executed-mark: #995500; --code-next-text: #805100; --code-error-bg: #fff0f2;
   --c-kw: #0000ff; --c-type: #267f99; --c-cmt: #008000; --c-str: #a31515; --c-num: #098658; --c-pre: #af00db; --c-fn: #795e26;
 }
 html[data-code-theme='dark'] {
   --code-bg: #1e1e1e; --code-text: #d4d4d4; --code-gutter: #252526; --code-muted: #a0a0a0;
-  --code-selection: #264f7880; --code-next-bg: #38331d; --code-next-text: #ffdb76; --code-error-bg: #512d3b;
+  --code-selection: #264f7880; --code-next-bg: #38331d; --code-executed-bg: #62491f; --code-executed-mark: #ffd079; --code-next-text: #ffdb76; --code-error-bg: #512d3b;
   --c-kw: #c586c0; --c-type: #4ec9b0; --c-cmt: #8cba75; --c-str: #ce9178; --c-num: #b5cea8; --c-pre: #9cdcfe; --c-fn: #dcdcaa;
 }
 html[data-code-theme='dracula'] {
   --code-bg: #282a36; --code-text: #f8f8f2; --code-gutter: #242631; --code-muted: #a4afd0;
-  --code-selection: #646a8980; --code-next-bg: #333020; --code-next-text: #f1fa8c; --code-error-bg: #512d3b;
+  --code-selection: #646a8980; --code-next-bg: #333020; --code-executed-bg: #604b36; --code-executed-mark: #ffcf83; --code-next-text: #f1fa8c; --code-error-bg: #512d3b;
   --c-kw: #ff79c6; --c-type: #8be9fd; --c-cmt: #a4afd0; --c-str: #f1fa8c; --c-num: #bd93f9; --c-pre: #ffb86c; --c-fn: #50fa7b;
 }
-.editor, .code-view { color: var(--code-text); background: var(--code-bg); }
-#edit-lines { color: var(--code-muted); background: var(--code-gutter); }
-.source-wrap { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
-#source { position: absolute; inset: 0; z-index: 1; background: transparent; color: var(--code-text); caret-color: var(--code-text); }
-#edit-highlight { position: absolute; inset: 0; margin: 0; padding: 8px 10px; overflow: hidden; pointer-events: none; user-select: none; font: inherit; white-space: pre; tab-size: 4; color: var(--code-text); }
-html.syntax-ready #source { color: transparent; -webkit-text-fill-color: transparent; }
-#source::selection { background: var(--code-selection); }
-.code-view ::selection { background: var(--code-selection); }
-.line-number { color: var(--code-muted); }
-.code-line.current, .code-line.executed.current { background: var(--code-next-bg); box-shadow: inset 4px 0 var(--code-next-text); }
-.code-line.current .line-number { color: var(--code-next-text); }
-.code-line.compile-error { background: var(--code-error-bg); }
 .token-keyword { color: var(--c-kw); }
 .token-type { color: var(--c-type); }
 .token-number { color: var(--c-num); }
@@ -63,9 +50,8 @@ html.syntax-ready #source { color: transparent; -webkit-text-fill-color: transpa
 .token-comment { color: var(--c-cmt); }
 .token-preprocessor { color: var(--c-pre); }
 .token-function { color: var(--c-fn); }
-.editor-end-line { display: inline-block; width: 0; height: 24px; vertical-align: top; }
 @media (forced-colors: active) {
-#edit-highlight { visibility: hidden; }
-html.syntax-ready #source { color: CanvasText; -webkit-text-fill-color: CanvasText; caret-color: CanvasText; }
+  #edit-highlight { visibility: hidden; }
+  html.syntax-ready #source { color: CanvasText; -webkit-text-fill-color: CanvasText; caret-color: CanvasText; }
+  .line-number.executed { outline: 2px solid Highlight; outline-offset: -2px; }
 }
-.diagnostics { box-shadow: none; }

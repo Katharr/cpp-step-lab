@@ -23,67 +23,90 @@ export function createEditor({
         fragment.append(document.createTextNode(line));
         return fragment;
       });
-      const content = document.createDocumentFragment();
-      highlightedLines.forEach((line, index) => {
-        if (index) content.append(document.createTextNode('\n'));
-        content.append(line.cloneNode(true));
-      });
-      // textarea 的末尾空行需要同高的布局占位，不参与词法结果或源代码。
-      if (source.endsWith('\n')) {
-        const endLine = document.createElement('span');
-        endLine.className = 'editor-end-line';
-        content.append(endLine);
-      }
-      $('edit-highlight').replaceChildren(content);
     }
-    syncEditorScroll();
     return highlightedLines;
   }
-  function mode(editing) {
-    $('editor').hidden = !editing;
-    $('code-view').hidden = editing;
-    $('edit').setAttribute('aria-pressed', String(editing));
-    $('view').setAttribute('aria-pressed', String(!editing));
-    actions.renderInput();
+  function codeLockReason() {
+    if (state.starting) return '正在编译，代码已锁定';
+    if (state.stopping) return '正在停止，请稍候';
+    if (state.uncertain) return '执行状态未确认，请重新连接后重新运行';
+    if (state.busy) return '正在执行，代码已锁定';
+    if (state.lessonLoading) return '正在载入课例，请稍候';
+    if (state.historyIndex >= 0 && state.historyIndex < state.history.length - 1) return '正在回看历史，返回最新后可修改';
+    if (state.liveSnapshot?.status === 'paused' || state.playing) return '运行中，代码已锁定；停止后可修改';
+    return '';
   }
-  function renderCode(focusLine = state.snapshot?.frames?.[0]?.user === false ? null : state.snapshot?.line ?? state.errorLines[0]) {
+  function executionLine() {
+    const before = state.previous, now = state.snapshot;
+    if (!before || before.runId !== now?.runId || before.step >= now.step || before.status !== 'paused' ||
+        !['next', 'step'].includes(now.motion) || !['paused', 'completed'].includes(now.status) ||
+        before.frames?.[0]?.user === false) return null;
+    // 进入函数只完成了调用的一部分，不把尚未返回的调用表达式标为已完成。
+    if (now.frames?.slice(1).some(frame => frame.id === before.frames?.[0]?.id)) return null;
+    return before.line;
+  }
+  let renderedPosition = '';
+  function renderCode(focusLine) {
     const source = $('source').value.replace(/\r\n?/g, '\n');
     const lines = source.split('\n');
     const colored = syntaxLines(source);
-    $('edit-lines').textContent = lines.map((_, i) => i + 1).join('\n');
+    const next = state.snapshot?.status === 'paused' && state.snapshot.frames?.[0]?.user !== false ? state.snapshot.line : null;
+    const executed = executionLine();
     const fragment = document.createDocumentFragment();
+    const gutter = document.createDocumentFragment();
     for (let i = 0; i < lines.length; i++) {
+      const line = i + 1;
       const row = document.createElement('span');
       row.className = 'code-line';
-      row.dataset.line = i + 1;
-      if (state.previous?.runId === state.snapshot?.runId && state.previous?.step < state.snapshot?.step && state.previous?.line === i + 1 && state.previous?.frames?.[0]?.user !== false && state.snapshot?.motion && (state.snapshot.status !== 'paused' || state.snapshot.frames?.[0]?.user !== false && state.snapshot.frames.length <= (state.previous.frames?.length || 0)) && !['stopped', 'step_limit', 'compile_error', 'error'].includes(state.snapshot.status)) {
-        row.classList.add('executed');
-        row.title = '刚执行';
-      }
-      if (i + 1 === focusLine) {
-        row.classList.add(state.errorLines.includes(focusLine) ? 'compile-error' : 'current');
-        row.setAttribute('aria-current', 'step');
-      }
+      row.dataset.line = line;
       const number = document.createElement('span');
       number.className = 'line-number';
-      number.textContent = i + 1;
+      number.textContent = line;
+      if (line === executed) {
+        row.classList.add('executed');
+        number.classList.add('executed');
+        row.title = '刚执行：本步从此行推进';
+      }
+      if (line === next) {
+        row.classList.add('current');
+        number.classList.add('current');
+        row.setAttribute('aria-current', 'step');
+        row.title = line === executed ? '刚执行 · 下一条仍在此行' : '下一条待执行';
+      }
+      if (state.errorLines.includes(line)) {
+        row.classList.add('compile-error');
+        number.classList.add('compile-error');
+      }
       const code = document.createElement('span');
       code.className = 'line-text';
       code.append(colored[i].cloneNode(true));
-      if (!lines[i]) code.append(document.createTextNode(' '));
-      row.append(number, code);
+      row.append(code);
+      if (i) {
+        fragment.append(document.createTextNode('\n'));
+        gutter.append(document.createTextNode('\n'));
+      }
       fragment.append(row);
+      gutter.append(number);
     }
-    $('code-view').replaceChildren(fragment);
-    const row = $('code-view').querySelector('[aria-current]');
-    if (row && !$('code-view').hidden) {
-      // 只滚代码区，不把控制条滚出屏幕。
-      const view = $('code-view');
-      const top = row.getBoundingClientRect().top - view.getBoundingClientRect().top + view.scrollTop;
-      if (top < view.scrollTop || top + row.offsetHeight > view.scrollTop + view.clientHeight) {
+    // 每行共享最长行宽度，横向滚动后短行的整行底色仍覆盖可见区域。
+    const content = document.createElement('span');
+    content.className = 'code-lines';
+    content.append(fragment);
+    $('edit-highlight').replaceChildren(content);
+    $('edit-lines').replaceChildren(gutter);
+    $('line-hint').textContent = executed ? `● 刚执行：第 ${executed} 行` + (next ? ` · ➜ 下一条：第 ${next} 行` : '') : next ? `➜ 下一条：第 ${next} 行` : '';
+    const position = state.snapshot ? `${state.snapshot.runId}:${state.snapshot.step}` : '';
+    // 只在执行位置变化或显式定位诊断时跟随；普通输入和主题更新不抢滚动位置。
+    const target = focusLine ?? (position !== renderedPosition ? executed ?? next : null);
+    renderedPosition = position;
+    if (target) {
+      const view = $('source');
+      const top = 8 + (target - 1) * 24;
+      if (top < view.scrollTop || top + 24 > view.scrollTop + view.clientHeight) {
         view.scrollTop = Math.max(0, top - view.clientHeight / 3);
       }
     }
+    syncEditorScroll();
   }
   function compilerInfo(result) {
     state.errorLines = [];
@@ -101,13 +124,11 @@ export function createEditor({
       button.textContent = `第 ${line} 行，第 ${match[2]} 列 · ${isError ? '错误' : match[3] === 'warning' ? '警告' : '提示'}`;
       button.title = match[4];
       button.addEventListener('click', () => {
-        mode(false);
         renderCode(line);
       });
       $('diagnostic-links').append(button);
     }
     if (result?.status === 'compile_error' && state.errorLines.length) {
-      mode(false);
       renderCode(state.errorLines[0]);
     }
   }
@@ -125,7 +146,7 @@ export function createEditor({
   }
   return {
     syncEditorScroll,
-    mode,
+    codeLockReason,
     renderCode,
     compilerInfo,
     edited
