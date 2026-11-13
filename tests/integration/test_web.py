@@ -9,6 +9,7 @@ import threading
 import time
 import unittest
 from unittest.mock import Mock, patch
+import socket
 import urllib.error
 import urllib.request
 from urllib.parse import quote
@@ -74,6 +75,18 @@ class DisconnectionTests(unittest.TestCase):
         handler.wfile.write.side_effect = OSError("测试写入错误")
         with self.assertRaises(OSError):
             handler.respond(200, {})
+
+
+class PortBindingTests(unittest.TestCase):
+    def test_second_service_cannot_share_a_listening_port(self):
+        occupied = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        occupied.bind(("127.0.0.1", 0))
+        occupied.listen()
+        try:
+            with self.assertRaises(OSError):
+                LabServer(("127.0.0.1", occupied.getsockname()[1]))
+        finally:
+            occupied.close()
 
 
 class WebTests(unittest.TestCase):

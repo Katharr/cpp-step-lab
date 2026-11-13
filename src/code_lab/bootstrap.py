@@ -19,7 +19,7 @@ import webbrowser
 from urllib.request import Request, urlopen, ProxyHandler, build_opener
 
 from code_lab.paths import ROOT, STATE, ascii_temp_base
-from code_lab.config import DEFAULT_PORT
+from code_lab.config import DEFAULT_PORT, PORT_SEARCH_LIMIT
 OPENER = build_opener(ProxyHandler({}))
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
@@ -211,16 +211,25 @@ def main():
     server = None
     token = uuid.uuid4().hex
     try:
-        try:
-            server = LabServer(("127.0.0.1", args.port))
-        except OSError as error:
-            raise RuntimeError(f"端口 {args.port} 被占用，未停止其它程序。可运行 start.bat --port 8766。") from error
+        requested_port = args.port
+        last_error = None
+        for port in range(requested_port, min(65535, requested_port + PORT_SEARCH_LIMIT - 1) + 1):
+            try:
+                server = LabServer(("127.0.0.1", port))
+                break
+            except OSError as error:
+                last_error = error
+        if server is None:
+            raise RuntimeError(f"端口 {requested_port} 至少连续 {PORT_SEARCH_LIMIT} 个端口被占用。") from last_error
         server.shutdown_token = token
         url = f"http://127.0.0.1:{server.server_port}/"
         STATE.parent.mkdir(exist_ok=True)
         STATE.write_text(json.dumps({"pid": os.getpid(), "token": token, "url": url,
                                     "workDir": str(work), "aliasDir": str(alias) if alias else None}), encoding="utf-8")
-        print(f"代码实验台 {VERSION} 已启动：{url}\n保持此窗口开启；下课后按 Ctrl+C 或双击 stop.bat。", flush=True)
+        message = f"代码实验台 {VERSION} 已启动：{url}"
+        if server.server_port != requested_port:
+            message += f"（端口 {requested_port} 被占用，已自动改用 {server.server_port}）"
+        print(message + "\n保持此窗口开启；下课后按 Ctrl+C 或双击 stop.bat。", flush=True)
         if not args.no_browser:
             # 先打开系统浏览器，再把服务自身加入 Job，避免连浏览器一起回收。
             try:

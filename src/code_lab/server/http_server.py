@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import socket
 import sys
 import threading
 from urllib.parse import urlsplit
@@ -17,6 +18,15 @@ from code_lab.server.static_files import resolve_static
 
 class LabServer(ThreadingHTTPServer):
     daemon_threads = False
+    # Windows 默认允许 SO_REUSEADDR 造成两个本地进程同时 bind 同一端口。
+    # 后到的连接可能被其它进程接收，浏览器于是看到“已启动”但页面打不开。
+    # 使用独占地址复用语义，让端口冲突在构造服务时可靠地抛出 OSError。
+    allow_reuse_address = False
+
+    def server_bind(self):
+        if sys.platform == "win32":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
     def __init__(self, address, timeout=EXECUTION_TIMEOUT):
         super().__init__(address, Handler)
