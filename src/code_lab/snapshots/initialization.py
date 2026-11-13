@@ -266,14 +266,14 @@ def apply_value_state(item, known, line, facts):
     item["note"] = "状态未确认：未观察到可证明的初始化"
     if item["readError"]:
         item["note"] = "读取失败：" + item["readError"]
-    elif global_scope or item["kind"] == "argument":
-        item["state"], item["note"] = "ok", None
-    elif item.get("staticStorage") and line and line > item["declaration"]:
-        item["state"], item["note"] = "ok", None
     elif identity in known:
         item["state"] = known[identity]
         item["note"] = {"ok": None, "uninitialized": "已执行声明，尚未初始化",
                         "unavailable": "状态未确认：初始化来源无法证明"}[item["state"]]
+    elif global_scope or item["kind"] == "argument":
+        item["state"], item["note"] = "ok", None
+    elif item.get("staticStorage") and line and line > item["declaration"]:
+        item["state"], item["note"] = "ok", None
     elif line and line <= item["declaration"]:
         item["state"], item["note"] = "out_of_scope", "尚未执行声明"
     elif facts and not facts["initialized"]:

@@ -14,9 +14,15 @@ def collect(destination, windows_path="windows.json", default_limit=50, max_elem
     frames = []
     variables = []
     frame = gdb.newest_frame()
+    checkpoint = None
+    if frame and frame.name() == "code_lab_trace::checkpoint":
+        checkpoint = {"site": int(frame.read_var("site")), "phase": int(frame.read_var("phase"))}
     globals_seen = set()
     level = 0
     while frame is not None:
+        if (frame.name() or "").startswith("code_lab_trace::"):
+            frame = frame.older()
+            continue
         location = frame.find_sal()
         filename = location.symtab.fullname() if location.symtab else None
         try:
@@ -36,6 +42,8 @@ def collect(destination, windows_path="windows.json", default_limit=50, max_elem
                 for symbol in block:
                     if not (symbol.is_variable or symbol.is_argument) or symbol.is_artificial:
                         continue
+                    if symbol.name.startswith("__code_lab_return_"):
+                        continue
                     if not symbol.symtab or os.path.basename(symbol.symtab.fullname()) != "main.cpp":
                         continue
                     scope = f"{block.start}:{block.end}"
@@ -54,6 +62,11 @@ def collect(destination, windows_path="windows.json", default_limit=50, max_elem
                             "rawValue": None, "readError": None}
                     try:
                         value = symbol.value(frame)
+                        storage = value
+                        if storage.type.strip_typedefs().code in (gdb.TYPE_CODE_REF, gdb.TYPE_CODE_RVALUE_REF):
+                            storage = storage.referenced_value()
+                        item["storageAddress"] = str(int(storage.address)) if storage.address is not None else None
+                        value = storage
                         item["data"] = describe(value, {"limit": default_limit, **windows.get(identity, {})})
                         if not item["data"]:
                             if value.is_optimized_out or value.is_unavailable:
@@ -79,5 +92,6 @@ def collect(destination, windows_path="windows.json", default_limit=50, max_elem
         input_succeeded = False
     with open(destination, "w", encoding="utf-8") as handle:
         json.dump({"frames": frames, "variables": variables,
+                   "checkpoint": checkpoint,
                    "inputTraceAvailable": input_available,
                    "inputSucceeded": input_succeeded}, handle, ensure_ascii=False)

@@ -411,9 +411,30 @@ export function createData({
   async function changeWindow(variableId, offset, limit, {
     prefix = false
   } = {}) {
-    if (state.busy || state.stopping || state.playing || state.snapshot?.status !== 'paused' || state.uncertain) return;
+    if (state.busy || state.stopping || state.playing || !state.snapshot || state.uncertain) return;
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) {
       notice('窗口起点须为非负整数，数量须为 1–200。');
+      return;
+    }
+    const historical = state.historyIndex < state.history.length - 1 || state.snapshot.status !== 'paused';
+    if (historical) {
+      const snapshot = structuredClone(state.snapshot);
+      const variable = snapshot.variables.find(item => item.id === variableId);
+      if (!variable?.data) return;
+      const data = variable.data;
+      const cache = snapshot.observations?.[variableId] || Object.fromEntries(data.elements.map(item => [item.coordinates.join(','), item]));
+      data.offset = Math.min(offset, Math.max(0, data.total - 1));
+      data.limit = limit;
+      data.elements = [];
+      for (let index = data.offset; index < Math.min(data.total, data.offset + limit); index++) {
+        const coordinates = data.shape.length === 2
+          ? [Math.floor(index / data.shape[1]) + (data.lowerBounds[0] || 0), index % data.shape[1] + (data.lowerBounds[1] || 0)]
+          : [index + (data.lowerBounds[0] || 0)];
+        data.elements.push(cache[coordinates.join(',')] || { index, coordinates, state: 'unavailable', value: null, note: '该暂停点未记录此元素', changed: false, previousValue: null });
+      }
+      data.hidden = data.total - data.elements.length;
+      state.snapshot = snapshot;
+      actions.render();
       return;
     }
     state.busy = true;

@@ -6,7 +6,7 @@ def empty_access():
     return {"line": None, "reads": [], "writes": []}
 
 
-def collect_access(facts, previous, frames, motion, status):
+def collect_access(facts, previous, frames, motion, status, statement=None):
     result = empty_access()
     if not previous or previous["status"] != "paused" or status != "paused" or motion not in ("next", "step"):
         return result
@@ -17,7 +17,7 @@ def collect_access(facts, previous, frames, motion, status):
     if entered_call:
         if motion != "step" or not any(frame["id"] == old["id"] for frame in frames[1:]):
             return result
-    elif frames[0]["line"] == old["line"]:
+    elif statement is None and frames[0]["line"] == old["line"]:
         return result
     line = old["line"]
     lookup = {}
@@ -25,6 +25,7 @@ def collect_access(facts, previous, frames, motion, status):
         if item.get("visible") and not item.get("shadowed"):
             lookup.setdefault(item["name"], item)
     # 控制语句只分析条件，不能递归把尚未执行的分支/循环体算作本步访问。
+    explicit = statement is not None
     conditions = []
     for node in _walk(facts.tree.root_node):
         if node.type not in ("if_statement", "while_statement"):
@@ -35,7 +36,9 @@ def collect_access(facts, previous, frames, motion, status):
     statements = [node for node in _walk(facts.tree.root_node)
                   if node.type in ("expression_statement", "declaration")
                   and node.start_point.row + 1 <= line <= node.end_point.row + 1]
-    if conditions:
+    if explicit:
+        pass
+    elif conditions:
         if len(conditions) != 1:
             return result
         statement = conditions[0]
@@ -51,15 +54,15 @@ def collect_access(facts, previous, frames, motion, status):
     if statement.has_error:
         return result
     output_call, stream_output = _standard_output(facts, statement, lookup)
-    if not entered_call and statement.start_point.row != statement.end_point.row:
+    if not explicit and not entered_call and statement.start_point.row != statement.end_point.row:
         # 仅在离开完整语句后标记；不依赖输出刷新，也不把中途暂停当作完成。
         if statement.start_point.row + 1 <= frames[0]["line"] <= statement.end_point.row + 1:
             return result
-    if statement.type == "declaration" and len(statement.children_by_field_name("declarator")) != 1:
+    if not explicit and statement.type == "declaration" and len(statement.children_by_field_name("declarator")) != 1:
         return result
     ancestor = statement.parent
     while ancestor:
-        if ancestor.type in ("if_statement", "while_statement", "for_statement", "do_statement", "switch_statement") and ancestor.start_point.row + 1 == line and not conditions:
+        if not explicit and ancestor.type in ("if_statement", "while_statement", "for_statement", "do_statement", "switch_statement") and ancestor.start_point.row + 1 == line and not conditions:
             return result
         ancestor = ancestor.parent
     # 分别识别表达式中的确定读写与函数实参使用，不再因某个调用屏蔽整句。
@@ -72,7 +75,7 @@ def collect_access(facts, previous, frames, motion, status):
         return result
     if len(assignments) + len(updates) > 1:
         return result
-    if updates and (statement.named_child_count != 1 or statement.named_children[0].id != updates[0].id):
+    if updates and not explicit and (statement.named_child_count != 1 or statement.named_children[0].id != updates[0].id):
         return result
     calls = [node for node in nodes if node.type == "call_expression"]
     addressed = set()

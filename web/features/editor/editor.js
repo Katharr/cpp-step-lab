@@ -38,6 +38,10 @@ export function createEditor({
   }
   function executionLine() {
     const before = state.previous, now = state.snapshot;
+    if (now?.execution) {
+      const spans = now.execution.spans || [];
+      return spans.length ? spans.at(-1).line : null;
+    }
     if (!before || before.runId !== now?.runId || before.step >= now.step || before.status !== 'paused' ||
         !['next', 'step'].includes(now.motion) || !['paused', 'completed'].includes(now.status) ||
         before.frames?.[0]?.user === false) return null;
@@ -52,6 +56,12 @@ export function createEditor({
     const colored = syntaxLines(source);
     const next = state.snapshot?.status === 'paused' && state.snapshot.frames?.[0]?.user !== false ? state.snapshot.line : null;
     const executed = executionLine();
+    const executionSpans = state.snapshot?.execution?.spans || [];
+    const selectedFrame = executionSpans.at(-1)?.frameId;
+    const executedLines = new Set();
+    for (const span of executionSpans.filter(span => span.frameId === selectedFrame)) {
+      for (let line = span.line; line <= span.endLine; line++) executedLines.add(line);
+    }
     const fragment = document.createDocumentFragment();
     const gutter = document.createDocumentFragment();
     for (let i = 0; i < lines.length; i++) {
@@ -62,7 +72,7 @@ export function createEditor({
       const number = document.createElement('span');
       number.className = 'line-number';
       number.textContent = line;
-      if (line === executed) {
+      if (executedLines.has(line) || line === executed) {
         row.classList.add('executed');
         number.classList.add('executed');
         row.title = '刚执行：本步从此行推进';

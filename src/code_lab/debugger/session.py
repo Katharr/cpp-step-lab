@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import shutil
 import sys
+import subprocess
 import tempfile
 import threading
 import time
@@ -80,7 +81,19 @@ class Transport(Session):
             process = self.controller.gdb_process if self.controller else None
             if process and process.poll() is None:
                 kill_process(process)
-                process.wait(timeout=10)
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    # taskkill 可能已经结束 inferior，但 GDB 管道仍未及时返回。
+                    # 关闭调试会话不能把清理动作升级成测试失败。
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+                    try:
+                        process.wait(timeout=2)
+                    except (subprocess.TimeoutExpired, OSError):
+                        pass
             if self.controller:
                 self.controller.exit()
         finally:
@@ -117,6 +130,8 @@ class DebugSession:
         self.log_dir = None
         self.windows = {}
         self.input_consumed = 0
+        self.evidence = None
+        self._pending_raw = None
 
     @property
     def history(self):
@@ -196,16 +211,75 @@ class DebugSession:
         self.input_consumed = consumed
         return trace
 
+    def _collect(self):
+        (self.work / "windows.json").write_text(json.dumps(self.windows), encoding="utf-8")
+        self.transport.command(
+            f'-interpreter-exec console "python collect(\'state.json\', '
+            f'default_limit={WINDOW_DEFAULT}, max_elements={WINDOW_MAX})"')
+        raw = json.loads((self.work / "state.json").read_text(encoding="utf-8"))
+        with (self.log_dir / "raw-states.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(raw, ensure_ascii=False) + "\n")
+        return raw
+
+    def _advance(self, motion, starting=False):
+        origin_raw = self._pending_raw or {}
+        origin = origin_raw.get("frames", [])
+        owner = origin[0]["key"] if origin else None
+        deadline = time.monotonic() + self.timeout
+        self.evidence.begin_step()
+        if motion == "continue":
+            # CLI 连续运行不展开内部步骤；保留最后观测，而非宣称恢复未记录的终态。
+            self.transport.command("-break-disable 2")
+            stop = self.transport.command("-exec-continue", motion=True)
+            self.status = self._stop_status(stop)
+            if self.status == "paused":
+                self.transport.command("-break-enable 2")
+                self._pending_raw = self._collect()
+            elif self.status == "runtime_error" and self.evidence.last_raw:
+                # 故障点可能停在不可安全求值的帧；沿用最后一个可信暂停点。
+                self._pending_raw = deepcopy(self.evidence.last_raw)
+            return stop
+        while True:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("连续执行超时")
+            sizes = {name: (self.work / name).stat().st_size if (self.work / name).exists() else 0 for name in ("stdout.txt", "stdout-trace.txt", "stderr.txt")}
+            if max(sizes["stdout.txt"], sizes["stdout-trace.txt"]) + sizes["stderr.txt"] > self.output_limit:
+                raise OverflowError("程序输出超过上限")
+            stop = self.transport.command("-exec-continue", motion=True)
+            self.status = self._stop_status(stop)
+            if self.status != "paused":
+                if self.evidence.last_raw:
+                    self._pending_raw = deepcopy(self.evidence.last_raw)
+                return stop
+            raw = self._collect()
+            checkpoint = raw.get("checkpoint")
+            if not checkpoint:
+                self._pending_raw = raw
+                return stop
+            self.evidence.observe(raw)
+            self._pending_raw = raw
+            if checkpoint["phase"] != 0:
+                continue
+            keys = {frame["key"] for frame in raw["frames"]}
+            current = raw["frames"][0]["key"] if raw["frames"] else None
+            same_site = origin_raw.get("checkpoint") == raw.get("checkpoint")
+            if (not starting and motion == "next" and same_site
+                    and all(span["kind"] == "condition" for span in self.evidence.spans)
+                    and [(item["rawId"], item["rawValue"], item.get("data")) for item in origin_raw.get("variables", [])]
+                    == [(item["rawId"], item["rawValue"], item.get("data")) for item in raw.get("variables", [])]):
+                continue
+            if starting or motion == "step" or (motion == "next" and (current == owner or owner not in keys)) or (motion == "finish" and owner not in keys):
+                return stop
+
     def _snapshot(self, motion=None, reason=None, refresh=False):
         raw = {"frames": [], "variables": []}
-        if self.status == "paused":
-            (self.work / "windows.json").write_text(json.dumps(self.windows), encoding="utf-8")
-            self.transport.command(
-                f'-interpreter-exec console "python collect(\'state.json\', '
-                f'default_limit={WINDOW_DEFAULT}, max_elements={WINDOW_MAX})"')
-            raw = json.loads((self.work / "state.json").read_text(encoding="utf-8"))
-            with (self.log_dir / "raw-states.jsonl").open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(raw, ensure_ascii=False) + "\n")
+        if self.evidence:
+            raw = self._collect() if refresh else self._pending_raw or raw
+            raw = self.evidence.decorate(raw, motion, self.status)
+        elif self.status == "paused":
+            raw = self._collect()
+        if refresh and self.evidence:
+            return self.builder.refresh(raw)
         if refresh:
             current = self.builder.history[-1]
             output, delta = deepcopy(current["output"]), deepcopy(current["outputDelta"])
@@ -250,6 +324,8 @@ class DebugSession:
 
     def _terminal(self, status, reason):
         self.status = status
+        if self.evidence and status in ("stopped", "step_limit"):
+            self.evidence.begin_step()
         # 先终止再收集文件，保证末尾输出固定，避免删除仍在写入的文件。
         if self.transport:
             self.transport.close()
@@ -264,6 +340,7 @@ class DebugSession:
                 self.cancelled = threading.Event()
                 self.run_id = uuid.uuid4().hex
             self.status, self.compile = "starting", {}
+            self.evidence = self._pending_raw = None
             self.windows = {}
             self.input_consumed = 0
             self.offsets = {"stdout": 0, "stderr": 0}
@@ -278,12 +355,18 @@ class DebugSession:
             try:
                 source_bytes = self.source.read_bytes()
                 self.builder = SnapshotBuilder(source_bytes.decode("utf-8-sig"))
+                from code_lab.debugger.execution_plan import ExecutionPlan
+                from code_lab.snapshots.execution import ExecutionEvidence
+                plan = ExecutionPlan(source_bytes.decode("utf-8-sig"))
+                self.evidence = ExecutionEvidence(plan, self.builder, self.run_id)
                 source_snapshot = self.log_dir / "source.cpp"
                 source_snapshot.write_bytes(source_bytes)
+                observed_source = self.log_dir / "observed.cpp"
+                observed_source.write_text(plan.generate(), encoding="utf-8", newline="\n")
                 self.work = Path(tempfile.mkdtemp(prefix="code-lab-debug-", dir=ascii_temp_base()))
                 (self.work / "io_trace.hpp").write_text(io_trace.HEADER, encoding="utf-8")
                 self.compile, executable = compile_source(
-                    find_compiler(), source_snapshot, self.work, COMPILE_TIMEOUT, self.standard,
+                    find_compiler(), observed_source, self.work, COMPILE_TIMEOUT, self.standard,
                     ("-gdwarf-4", "-fno-omit-frame-pointer", "-finput-charset=UTF-8", "-fexec-charset=UTF-8",
                      "-include", str(self.work / "io_trace.hpp"), *io_trace.LINK_FLAGS),
                     cancellation=self.cancelled)
@@ -300,11 +383,14 @@ class DebugSession:
                 for command in ("-gdb-set pagination off", "-gdb-set confirm off", f"-gdb-set print elements {WINDOW_MAX}",
                                 "-gdb-set step-mode off", "-environment-cd " + json.dumps(self.work.as_posix()),
                                 "-file-exec-and-symbols " + json.dumps(executable.as_posix()),
-                                '-interpreter-exec console "source gdb_state.py"', "-break-insert -t main"):
+                                '-interpreter-exec console "source gdb_state.py"', "-break-insert -t main",
+                                "-break-insert code_lab_trace::checkpoint"):
                     self.transport.command(command)
                 stop = self.transport.command(
                     '-interpreter-exec console "run < input.txt > stdout.txt 2> stderr.txt"', motion=True)
                 self.status = self._stop_status(stop)
+                if self.status == "paused":
+                    stop = self._advance("next", starting=True)
                 return self._snapshot(reason=stop)
             except (Exception, KeyboardInterrupt) as error:
                 return self._failure(error)
@@ -345,7 +431,7 @@ class DebugSession:
             if len(self.history) >= self.max_steps - 1:
                 return self._terminal("step_limit", "快照步数达到上限")
             try:
-                stop = self.transport.command(self.MOTIONS[command], motion=True)
+                stop = self._advance(command) if self.evidence else self.transport.command(self.MOTIONS[command], motion=True)
                 # main 返回后 GDB 可能停进 CRT；让其自然退出，不向课堂暴露库源码行。
                 frame = stop.get("frame") or {}
                 if (stop.get("reason") == "end-stepping-range" and frame

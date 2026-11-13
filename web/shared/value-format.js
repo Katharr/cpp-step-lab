@@ -1,6 +1,7 @@
 const stateText = {
   uninitialized: '未赋值',
   unavailable: '待确认',
+  unrecorded: '未记录',
   read_error: '读取失败',
   out_of_scope: '已离开作用域'
 };
@@ -12,6 +13,7 @@ export function createValueFormat({
     return variable.state === 'ok' && variable.value !== null ? String(variable.value) : stateText[valueState(variable)] || '值不可获取';
   }
   function valueState(variable) {
+    if (variable.note === '该暂停点未记录此元素') return 'unrecorded';
     return variable.state === 'unavailable' && variable.note?.startsWith('读取失败') ? 'read_error' : variable.state;
   }
   function becameKnown(value, before) {

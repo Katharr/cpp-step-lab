@@ -5,6 +5,7 @@ import gdb
 def element(value, index, coordinates):
     item = {"index": index, "coordinates": coordinates, "state": "ok", "value": None, "note": None}
     try:
+        item["storageAddress"] = str(int(value.address)) if value.address is not None else None
         if value.is_optimized_out or value.is_unavailable:
             raise gdb.error("调试值不可用或已被优化")
         item["value"] = value.format_string(raw=True, max_elements=8)
@@ -82,6 +83,10 @@ def describe(value, window):
             raise gdb.error("元素数量异常，未读取")
         offset = min(max(0, window.get("offset", 0)), max(0, total - 1))
         view.update(total=total, offset=offset)
+        if total:
+            first, _ = read(0)
+            view["storageBase"] = str(int(first.address)) if first.address is not None else None
+            view["elementSize"] = int(first.type.sizeof)
         for index in range(offset, min(total, offset + view["limit"])):
             try:
                 current, coords = read(index)

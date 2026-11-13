@@ -48,12 +48,34 @@ class SnapshotBuilder:
         self.initialization = InitializationTracker()
         self.identities = FrameIdentities()
 
+    def refresh(self, raw):
+        """暂停观测只补充窗口，不重放执行归因或初始化规则。"""
+        snapshot = deepcopy(self.history[-1])
+        baseline = {item["id"]: item for item in self.history[-2]["variables"]} if len(self.history) > 1 else {}
+        incoming = self.identities.annotate(raw["frames"], raw["variables"], snapshot["runId"])
+        by_id = {item["id"]: item for item in incoming}
+        observations = snapshot.setdefault("observations", {})
+        for item in snapshot["variables"]:
+            observed = by_id.get(item["id"])
+            if observed and observed.get("data"):
+                item["data"] = deepcopy(observed["data"])
+                item["rawId"] = observed["rawId"]
+                normalize_data(item, baseline.get(item["id"]))
+                cache = observations.setdefault(item["id"], {})
+                cache.update({','.join(map(str, element["coordinates"])): deepcopy(element)
+                              for element in item["data"]["elements"]})
+                item.pop("rawId", None)
+        self.previous = deepcopy(snapshot)
+        self.history[-1] = deepcopy(snapshot)
+        return snapshot
+
     def build(self, raw, run_id, output, delta, status="paused", motion=None, reason=None):
         previous = self.previous
         frames = raw.get("frames", [])
         variables = self.identities.annotate(frames, raw.get("variables", []), run_id)
         previous_vars = {item["id"]: item for item in (previous or {}).get("variables", [])}
-        self.initialization.observe(self.facts, previous, frames, variables, raw, motion, self.history)
+        if "execution" not in raw:
+            self.initialization.observe(self.facts, previous, frames, variables, raw, motion, self.history)
         visible = set()
         frame_map = {frame["key"]: frame for frame in frames}
         for item in variables:
@@ -91,7 +113,14 @@ class SnapshotBuilder:
                     "line": frames[0]["line"] if frames and status == "paused" else None,
                     "frames": frames, "variables": variables, "output": output,
                     "outputDelta": delta, "status": status, "reason": reason}
-        snapshot["arrayAccess"] = collect_access(self.facts, previous, frames, motion, status)
+        snapshot["observations"] = {item["id"]: {','.join(map(str, element["coordinates"])): deepcopy(element)
+                                                for element in item["data"]["elements"]}
+                                    for item in variables if item.get("data")}
+        if "execution" in raw:
+            snapshot["execution"] = deepcopy(raw["execution"])
+            snapshot["arrayAccess"] = deepcopy(raw["execution"]["access"])
+        else:
+            snapshot["arrayAccess"] = collect_access(self.facts, previous, frames, motion, status)
         self.previous = deepcopy(snapshot)
         self.history.append(deepcopy(snapshot))
         return snapshot
