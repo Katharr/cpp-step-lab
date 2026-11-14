@@ -25,5 +25,7 @@
     "consumed": 0,
     "deltaStart": 0,
     "deltaEnd": 0
-  }
+  },
+  "indexAssociations": {},
+  "indexPreviousValues": {}
 }

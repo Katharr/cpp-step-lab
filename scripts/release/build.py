@@ -55,6 +55,7 @@ APPLICATION_FILES = (
     'web/features/data/cell-access.js',
     'web/features/data/data.css',
     'web/features/data/data.js',
+    'web/features/data/index-markers.js',
     'web/features/editor/editor.css',
     'web/features/editor/editor.js',
     'web/features/editor/syntax.js',

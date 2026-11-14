@@ -1,4 +1,5 @@
 import { $, notice, node } from "../../shared/dom.js";
+import { mergeIndices, isIndexCandidate, indexChoices, markerValues, drawMarkers, indexColor } from './index-markers.js';
 import * as CellAccess from './cell-access.js';
 export function createData({
   state,
@@ -44,8 +45,12 @@ export function createData({
     }
     return result;
   }
-  function renderData() {
+  function renderData({ animate = false } = {}) {
     const container = $('data-views');
+    const oldMarkerPositions = new Map([...container.querySelectorAll('.index-pointer:not(.index-ghost)')].map(mark => [mark.closest('.data-card').dataset.variableId + ':' + mark.dataset.indexId, mark.getBoundingClientRect()]));
+    const stepKey = state.snapshot ? `${state.snapshot.runId}:${state.snapshot.step}` : '';
+    const animateIndices = animate && container.dataset.indexStep && container.dataset.indexStep !== stepKey && state.historyIndex === state.history.length - 1 && state.previous?.step === state.snapshot?.step - 1;
+    container.dataset.indexStep = stepKey;
     const active = document.activeElement;
     const activeCard = active?.closest('.data-card');
     const focus = activeCard && container.contains(activeCard) ? {
@@ -86,8 +91,23 @@ export function createData({
     $('frame').title = selected ? `${selected.function} · 第 ${selected.level + 1} 层` : '';
     actions.variables('frame-locals', selected?.level > 0 ? local : [], '此帧暂无可见变量');
     const views = [...local, ...global].filter(v => v.data);
-    container.replaceChildren(...views.map(variable => dataView(variable, variable.kind === 'global' ? global : [...local, ...global])));
+    container.replaceChildren(...views.map(variable => dataView(variable, [...local, ...global])));
+    for (const card of container.querySelectorAll('.data-card[data-kind="array"]')) {
+      const variable = views.find(item => item.id === card.dataset.variableId);
+      drawMarkers(card, variable, markerValues(state.snapshot, state.dataSettings.get(variable.id)), offset => changeWindow(variable.id, offset, variable.data.limit, { locate: true }));
+      if (animateIndices && document.documentElement.dataset.motion === 'standard') {
+        for (const mark of card.querySelectorAll('.index-pointer:not(.index-ghost)')) {
+          const old = oldMarkerPositions.get(variable.id + ':' + mark.dataset.indexId);
+          if (!old) continue;
+          const rect = mark.getBoundingClientRect();
+          mark.animate([{ transform: `translate(${old.left - rect.left}px,${old.top - rect.top}px)` }, { transform: 'translate(0,0)' }], { duration: 250, easing: 'ease-out' });
+        }
+      }
+    }
     for (const row of document.querySelectorAll('.variables-body [data-variable-id]')) {
+      const linked = views.some(variable => variable.data.kind === 'array' && state.dataSettings.get(variable.id)?.axes.includes(row.dataset.variableId));
+      row.classList.toggle('index-variable', linked);
+      if (linked) row.style.setProperty('--index-color', indexColor(items.find(item => item.id === row.dataset.variableId)));
       const binding = row.querySelector('.variable-binding');
       if (!binding) continue;
       const labels = [];
@@ -141,6 +161,7 @@ export function createData({
     if (!Number.isInteger(settings.prefixLimit) || settings.prefixLimit < 1 || settings.prefixLimit > 200) {
       settings.prefixLimit = Number.isInteger(data.limit) && data.limit >= 1 && data.limit <= 200 ? data.limit : 50;
     }
+    if (data.kind === 'array') mergeIndices(settings, state.snapshot, variable);
     state.dataSettings.set(variable.id, settings);
     const card = node('details', undefined, 'data-card');
     card.viewSettings = settings;
@@ -257,7 +278,7 @@ export function createData({
       const empty = node('option', '不关联');
       empty.value = '';
       select.append(empty);
-      for (const item of candidates.filter(v => !v.data && /^(?:const )?(?:(?:unsigned |signed )?(?:int|short|long|long long)|size_t)(?: const)?$/.test(v.type))) {
+      for (const item of candidates.filter(isIndexCandidate)) {
         const option = node('option', `${item.name}${item.kind === 'global' ? '（全局）' : ''} = ${actions.valueText(item)}`);
         option.value = item.id;
         select.append(option);
@@ -269,7 +290,10 @@ export function createData({
       }
       select.value = settings.axes[axis] || '';
       select.addEventListener('change', () => {
-        settings.axes[axis] = select.value;
+        if (data.kind === 'array') {
+          settings.excludedIndices = [...new Set([...(settings.excludedIndices || []), ...settings.axes])].filter(id => id !== select.value);
+          settings.axes = select.value ? [select.value] : [];
+        } else settings.axes[axis] = select.value;
         renderData();
         actions.controls();
       });
@@ -278,6 +302,7 @@ export function createData({
       values.push(chosen?.state === 'ok' && /^-?\d+$/.test(chosen.value || '') ? BigInt(chosen.value) : null);
     }
     tools.append(selectors);
+    if (data.kind === 'array') tools.append(indexChoices(settings, candidates, renderData));
     const outside = values.some((value, axis) => value !== null && (value < BigInt(data.lowerBounds[axis] || 0) || value >= BigInt((data.lowerBounds[axis] || 0) + (data.shape[axis] || 0))));
     const indicators = values.map((value, axis) => {
       const chosen = candidates.find(v => v.id === settings.axes[axis]);
@@ -285,7 +310,7 @@ export function createData({
     });
     const marker = node('p', indicators.join('；') + (outside ? ' → 越界（范围外）' : ''), 'index-status' + (outside ? ' out-of-range' : ''));
     marker.hidden = !outside && values.every(value => value === null) && !settings.axes.some(Boolean);
-    content.append(marker);
+    if (data.kind !== 'array') content.append(marker);
     const windowInfo = `共 ${data.total} 项 · 已隐藏 ${data.hidden}`;
     const info = node('p', windowInfo, 'window-info');
     tools.append(info);
@@ -339,12 +364,17 @@ export function createData({
       cell.dataset.value = element.value ?? '';
       cell.dataset.valueState = actions.valueState(element);
       const matches = values.some(value => value !== null) && !outside && values.every((value, axis) => value === null || value === BigInt(element.coordinates[axis]));
-      if (matches) {
+      if (data.kind === 'array') {
+        const indices = markerValues(state.snapshot, settings);
+        if (indices.some(item => item.value === BigInt(element.coordinates[0]) || item.previous === BigInt(element.coordinates[0]))) cell.dataset.indexProtected = 'true';
+      }
+      if (matches && data.kind !== 'array') {
         cell.classList.add('indexed');
         cell.dataset.pointerLabel = values.map((value, axis) => value === null ? '' : `${candidates.find(v => v.id === settings.axes[axis])?.name || (axis ? '列' : '行')} = ${value}`).filter(Boolean).join('；');
         marked = true;
       }
       cell.append(node('span', element.coordinates.map(v => '[' + v + ']').join(''), 'element-index'), node('strong', actions.valueText(element), 'element-value'));
+      if (data.kind === 'array') cell.append(cell.querySelector('.element-index'));
       if (data.kind === 'string' && element.state === 'ok') {
         const character = String(element.value ?? '').match(/^\s*([+-]?\d+)\s+('.*')$/s);
         if (character) {
@@ -370,7 +400,7 @@ export function createData({
     const foldable = ({
       element,
       cell
-    }) => element.state === 'ok' && element.value !== null && element.value !== undefined && !cell.matches('.changed, .indexed') && !CellAccess.isMarked(cell);
+    }) => element.state === 'ok' && element.value !== null && element.value !== undefined && !cell.matches('.changed, .indexed, [data-index-protected]') && !CellAccess.isMarked(cell);
     for (let start = 0; start < rendered.length;) {
       let end = start + 1;
       if (data.kind !== 'matrix' && data.kind !== 'string' && foldable(rendered[start])) {
@@ -408,8 +438,16 @@ export function createData({
     if (!data.elements.length) content.append(node('p', data.state === 'ok' ? '当前容器为空。' : data.note || '无法可靠读取元素。', 'empty'));
     return card;
   }
+  function resetScroll(variableId) {
+    const settings = state.dataSettings.get(variableId);
+    if (settings) settings.scrollLeft = settings.scrollTop = 0;
+    const card = [...$('data-views').querySelectorAll('.data-card')].find(item => item.dataset.variableId === variableId);
+    const scroll = card?.querySelector('.structure-scroll');
+    if (scroll) scroll.scrollLeft = scroll.scrollTop = 0;
+  }
   async function changeWindow(variableId, offset, limit, {
-    prefix = false
+    prefix = false,
+    locate = false
   } = {}) {
     if (state.busy || state.stopping || state.playing || !state.snapshot || state.uncertain) return;
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) {
@@ -434,6 +472,7 @@ export function createData({
       }
       data.hidden = data.total - data.elements.length;
       state.snapshot = snapshot;
+      if (locate) resetScroll(variableId);
       actions.render();
       return;
     }
@@ -453,16 +492,10 @@ export function createData({
         const currentSettings = state.dataSettings.get(variableId);
         if (currentSettings) currentSettings.prefixApplied = prefix;
         const settings = state.dataSettings.get(variableId);
-        if (prefix && settings) {
-          settings.prefixLimit = limit;
+        if ((prefix || locate) && settings) {
+          if (prefix) settings.prefixLimit = limit;
           // 应用“前 X 个”是明确定位操作；普通单步仍保留老师浏览位置。
-          const card = [...$('data-views').querySelectorAll('.data-card')].find(item => item.dataset.variableId === variableId);
-          const scroll = card?.querySelector('.structure-scroll');
-          if (scroll) {
-            scroll.scrollLeft = 0;
-            scroll.scrollTop = 0;
-          }
-          settings.scrollLeft = settings.scrollTop = 0;
+          resetScroll(variableId);
         }
         actions.remember(result);
         actions.render();

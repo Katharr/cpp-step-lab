@@ -28,6 +28,9 @@
 - `state` 区分 `ok/uninitialized/unavailable/out_of_scope`，无法确认的值不能显示为 0。
 - `data` 包含结构类型、形状、下界、总长度、当前窗口及元素；仅窗口内元素被读取。
 - `arrayAccess.reads/writes/uses` 通过 `variableId/coordinates` 定位确认的访问；`uses` 表示实参使用，不能冒充确定读取。
+- `indexAssociations` 将一维数组稳定身份映射到自动关联的下标变量身份列表。关联依据为词法声明、数组访问和不含调用或数组读取的标量计算，不依赖变量名或数值范围；复杂 C++ 语义可能需要手动纠正。
+- `variables[].indexColor` 为本次运行中稳定的颜色序号，同一身份跨数组共用。
+- `indexPreviousValues` 保存执行顺序前一步的变量值字符串或 null；历史回看直接使用该字段，窗口刷新保持不变。未确认或离开作用域的当前值不绘制箭头。
 - `output` 为累计 I/O，`outputDelta` 为本步增量，`inputTrace` 为可以确认的输入消费范围。
 - 刷新窗口不执行代码、不增加历史、不重置本步访问标记或 I/O 增量。
 - 历史快照独立保存，回看不改变真实程序，也不重播当步动画。

@@ -10,6 +10,46 @@ from tests.integration.test_session import variable
 
 
 class StructureTests(unittest.TestCase):
+    def test_binary_search_index_relationships_follow_real_snapshots(self):
+        session = self.start((Path(__file__).parents[1] / 'fixtures/cpp/binary_indices.cpp').read_text(encoding='utf-8'))
+        current = self.until(session, 'if (a[m]')
+        a = variable(current, 'a')
+        links = current['indexAssociations'][a['id']]
+        self.assertEqual({v['name'] for v in current['variables'] if v['id'] in links}, {'l', 'r', 'm'})
+        before = {v['id']: v['value'] for v in current['variables']}
+        saved = session.execute('next')
+        self.assertEqual(saved['indexPreviousValues'], before)
+        refreshed = session.window(session.run_id, a['id'], 2, 4)
+        self.assertEqual(refreshed['indexAssociations'], saved['indexAssociations'])
+        self.assertEqual(refreshed['indexPreviousValues'], saved['indexPreviousValues'])
+        self.assertEqual(refreshed['step'], saved['step'])
+
+    def test_index_names_and_recursive_instances_are_independent(self):
+        source = (Path(__file__).parents[1] / 'fixtures/cpp/binary_indices.cpp').read_text(encoding='utf-8')
+        import re
+        source = re.sub(r'\b[lrmt]\b', lambda match: {'l': 'x', 'r': 'y', 'm': 'z', 't': 'q'}[match[0]], source)
+        session = self.start(source)
+        current = self.until(session, 'if (a[z]')
+        links = current['indexAssociations'][variable(current, 'a')['id']]
+        self.assertEqual({v['name'] for v in current['variables'] if v['id'] in links}, {'x', 'y', 'z'})
+        session = self.start((Path(__file__).parents[1] / 'fixtures/cpp/index_identity.cpp').read_text(encoding='utf-8'))
+        for _ in range(60):
+            current = session.execute('step')
+            arrays = [v for v in current['variables'] if v['name'] == 'a' and v['state'] == 'ok']
+            if len(arrays) == 3 and all(current['indexAssociations'].get(v['id']) for v in arrays):
+                break
+        else:
+            self.fail('未捕获三层下标关联')
+        indices = []
+        for array in arrays:
+            links = current['indexAssociations'][array['id']]
+            self.assertEqual(len(links), 1)
+            index = next(v for v in current['variables'] if v['id'] == links[0])
+            self.assertEqual(index['frameKey'], array['frameKey'])
+            indices.append(index)
+        self.assertEqual(len({v['id'] for v in indices}), 3)
+        self.assertEqual(len({v['indexColor'] for v in indices}), 3)
+
     def test_if_comparison_reads_only_condition_and_restores_history(self):
         session = self.start('''int main() {
     int a[4] = {0, 2, 2, 0}; // a：测试数组

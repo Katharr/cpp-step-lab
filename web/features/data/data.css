@@ -85,3 +85,22 @@ html[data-theme='dark'] .element.zero-value.changed .element-value { color: var(
 .element[data-value-state='unavailable'] .element-value { color: var(--muted); font-size: 14px; font-weight: 400; }
 .element[data-value-state='uninitialized'], .element[data-value-state='read_error'] { background: var(--state-error-soft); border-color: var(--state-error); }
 .element[data-value-state='uninitialized'] .element-value, .element[data-value-state='read_error'] .element-value { color: var(--state-error); font-size: 14px; font-weight: 600; }
+
+.multi-index-grid { position: relative; }
+.index-marker-layer { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.index-pointer { font: 600 13px var(--font-mono); transform-box: fill-box; transform-origin: center; }
+.index-ghost { opacity: .38; }
+.index-hints { display: flex; gap: 6px 12px; flex-wrap: wrap; font: 12px var(--font-mono); }
+.index-hints button { font: inherit; background: var(--surface); border: 1px solid currentColor; border-radius: 4px; cursor: pointer; }
+.index-ghost-hint { opacity: .55; }
+.multi-index-controls label { display: inline-flex; align-items: center; margin-right: 10px; color: var(--text); }
+.index-variable td.value-cell { background: color-mix(in srgb, var(--index-color) 12%, var(--surface)); box-shadow: inset 3px 0 var(--index-color), inset 0 0 0 1px color-mix(in srgb, var(--index-color) 70%, transparent); }
+html[data-theme='dark'] .index-pointer, html[data-theme='dark'] .index-hints > * { filter: brightness(1.55); }
+
+.index-hints { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.index-hints > div { display: flex; flex-wrap: wrap; gap: 4px; overflow-wrap: anywhere; }
+.index-hints-right { justify-content: flex-end; text-align: right; }
+.index-hints-unknown { justify-content: center; }
+.index-hints button { max-width: 100%; overflow-wrap: anywhere; }
+html[data-theme='dark'] .index-hints > div > * { filter: brightness(1.55); }
+html[data-theme='dark'] .index-hints > div { filter: none; }

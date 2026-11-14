@@ -151,6 +151,27 @@
         "deltaStart",
         "deltaEnd"
       ]
+    },
+    "indexAssociations": {
+      "type": "object",
+      "description": "一维数组稳定身份到自动关联下标身份列表；本运行中保留。",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      }
+    },
+    "indexPreviousValues": {
+      "type": "object",
+      "description": "执行顺序前一步变量值，窗口刷新不改写。",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     }
   },
   "required": [
@@ -269,6 +290,10 @@
               "type": "null"
             }
           ]
+        },
+        "indexColor": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "required": [

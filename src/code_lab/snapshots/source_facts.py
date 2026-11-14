@@ -85,3 +85,52 @@ class SourceFacts:
     def safe_value(self, node, known, containers):
         """以当前语法事实验证表达式来源，不求值用户程序。"""
         return safe_value(self, node, known, containers)
+
+    def index_relationships(self):
+        """只沿直接下标与纯标量计算关联，按词法声明区分同名变量。"""
+        def resolve(node):
+            name = self.text(node)
+            matches = []
+            for (line, declared), fact in self.declarations.items():
+                if declared != name or fact["node"].start_byte > node.start_byte:
+                    continue
+                scope = fact["node"].parent
+                while scope.parent and scope.type not in ("compound_statement", "for_statement", "translation_unit"):
+                    scope = scope.parent
+                if scope.start_byte <= node.start_byte < scope.end_byte:
+                    matches.append((scope.end_byte - scope.start_byte, -line, (line, name)))
+            return min(matches)[2] if matches else None
+
+        graph = {}
+        direct = {}
+        for node in walk(self.tree.root_node):
+            if node.type == "subscript_expression":
+                base = node.child_by_field_name("argument")
+                indices = node.child_by_field_name("indices")
+                if base is None or base.type != "identifier" or indices is None:
+                    continue
+                array = resolve(base)
+                if array:
+                    direct.setdefault(array, set()).update(resolve(part) for part in walk(indices) if part.type == "identifier")
+            if node.type not in ("init_declarator", "assignment_expression"):
+                continue
+            left = node.child_by_field_name("declarator" if node.type == "init_declarator" else "left")
+            right = node.child_by_field_name("value" if node.type == "init_declarator" else "right")
+            operator = node.child_by_field_name("operator")
+            if (left is None or left.type != "identifier" or right is None
+                    or operator is not None and self.text(operator) != "="
+                    or any(part.type in ("subscript_expression", "call_expression", "update_expression", "assignment_expression") for part in walk(right))):
+                continue
+            target = resolve(left)
+            dependencies = {resolve(part) for part in walk(right) if part.type == "identifier"}
+            for dependency in dependencies - {None, target}:
+                graph.setdefault(target, set()).add(dependency)
+                graph.setdefault(dependency, set()).add(target)
+        for array, seeds in direct.items():
+            seeds.discard(None)
+            pending = list(seeds)
+            while pending:
+                for dependency in graph.get(pending.pop(), set()) - seeds - {None, array}:
+                    seeds.add(dependency)
+                    pending.append(dependency)
+        return direct

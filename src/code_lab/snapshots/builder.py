@@ -43,6 +43,9 @@ def normalize_data(item, old):
 class SnapshotBuilder:
     def __init__(self, source):
         self.facts = SourceFacts(source)
+        self.index_relationships = self.facts.index_relationships()
+        self.index_links = {}
+        self.index_colors = {}
         self.previous = None
         self.history = []
         self.initialization = InitializationTracker()
@@ -103,7 +106,7 @@ class SnapshotBuilder:
         live_ids = {item["id"] for item in variables}
         self.initialization.retain(live_ids)
         for identity, old in previous_vars.items():
-            if identity not in live_ids and old["state"] != "out_of_scope":
+            if identity not in live_ids and (old["state"] != "out_of_scope" or any(identity in links for links in self.index_links.values())):
                 item = dict(old)
                 item.update(state="out_of_scope", value=None, visible=False, changed=False,
                             previousValue=None, stateChanged=True, note="已退出作用域或调用帧")
@@ -113,6 +116,23 @@ class SnapshotBuilder:
                     "line": frames[0]["line"] if frames and status == "paused" else None,
                     "frames": frames, "variables": variables, "output": output,
                     "outputDelta": delta, "status": status, "reason": reason}
+        for item in variables:
+            if not item.get("data") and item["id"] not in self.index_colors:
+                self.index_colors[item["id"]] = len(self.index_colors)
+            if item["id"] in self.index_colors:
+                item["indexColor"] = self.index_colors[item["id"]]
+            if (item.get("data") or {}).get("kind") != "array":
+                continue
+            related = self.index_relationships.get((item["declaration"], item["name"]), set())
+            links = self.index_links.setdefault(item["id"], [])
+            for candidate in variables:
+                if ((candidate["declaration"], candidate["name"]) in related
+                        and not candidate.get("data") and candidate["state"] != "out_of_scope"
+                        and (candidate["kind"] == "global" or candidate["frameKey"] == item["frameKey"] or item["kind"] == "global" and candidate["frame"] == 0)
+                        and candidate["id"] not in links):
+                    links.append(candidate["id"])
+        snapshot["indexAssociations"] = deepcopy(self.index_links)
+        snapshot["indexPreviousValues"] = {identity: item["value"] for identity, item in previous_vars.items()}
         snapshot["observations"] = {item["id"]: {','.join(map(str, element["coordinates"])): deepcopy(element)
                                                 for element in item["data"]["elements"]}
                                     for item in variables if item.get("data")}

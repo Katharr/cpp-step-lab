@@ -33,7 +33,7 @@ export function createRenderer({
     const globals = items.filter(v => v.kind === 'global' && v.state !== 'out_of_scope');
     actions.variables('globals', globals, '—');
     if ($('globals-section')) $('globals-section').hidden = !globals.length;
-    actions.renderData();
+    actions.renderData({ animate });
     actions.renderOutput();
     actions.renderInput();
     $('stderr').textContent = state.snapshot?.output?.stderr || '';

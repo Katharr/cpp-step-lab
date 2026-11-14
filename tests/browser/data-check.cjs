@@ -229,13 +229,13 @@ int main() {
       let s = await sample('adjacent');
       s = await until(s, (s) => s.variables.some((v) => v.name === 'i' && v.state === 'ok'));
       await card('a').getByLabel('a 下标', { exact: true }).selectOption(s.variables.find((v) => v.name === 'i').id);
-      assert.equal(await card('a').locator('.indexed').getAttribute('data-index'), '1');
+      assert.equal(await card('a').locator('.index-pointer:not(.index-ghost)').getAttribute('data-position'), '1');
       s = await until(s, (s) => s.variables.some((v) => v.name === 'a' && v.data?.elements[1]?.changed));
       assert.equal(await card('a').locator('.element.changed').getAttribute('data-index'), '1');
       s = await action('next');
       assert.equal(await card('a').locator('.element.changed').getAttribute('data-index'), '2');
       s = await action('next');
-      assert.match(await card('a').locator('.index-status').textContent(), /越界/);
+      assert.match(await card('a').locator('.index-hints').textContent(), /越界/);
       assert.equal(await card('a').locator('.indexed').count(), 0);
       await finish(s, '4 1');
     });
