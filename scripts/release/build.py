@@ -92,6 +92,8 @@ APPLICATION_FILES = (
     'contracts/lesson.schema.json',
     'contracts/snapshot.schema.json',
     'docs/README.md',
+    'docs/GLOSSARY.md',
+    'docs/adr/0001-execution-interval-and-evidence.md',
     'docs/api.md',
     'docs/architecture.md',
     'docs/images/prefix-access.png',
