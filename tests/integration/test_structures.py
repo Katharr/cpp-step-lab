@@ -606,17 +606,33 @@ int main() {
         self.assertEqual([len(variable(current, "a", i)["data"]["elements"]) for i in range(3)], [2, 1, 2])
 
     def test_uninitialized_arrays_never_expose_stack_values(self):
-        session = self.start('''int main() {
-    int a[3];
-    int x = 1;
-    x++;
-    return 0;
-}
-''')
+        source = (Path(__file__).parents[1] / 'fixtures/cpp/uninitialized_array.cpp').read_text(encoding='utf-8')
+        session = self.start(source)
         current = self.until(session, "x++")
         item = variable(current, "a")
-        self.assertNotEqual(item["state"], "ok")
-        self.assertTrue(all(e["value"] is None and not e["changed"] for e in item["data"]["elements"]))
+        # 数组结构可确认；元素的初始化证据独立，不能用整体 state 判断元素可信性。
+        self.assertEqual(item["state"], "ok")
+        self.assertTrue(item["data"]["elements"])
+        self.assertTrue(all(e["state"] == "uninitialized" and e["value"] is None and not e["changed"]
+                            for e in item["data"]["elements"]))
+        step = current['step']
+        observed = session.window(session.run_id, item['id'], 70, 20)
+        self.assertEqual(observed['step'], step)
+        self.assertTrue(all(e['state'] == 'uninitialized' and e['value'] is None
+                            for e in variable(observed, 'a')['data']['elements']))
+        self.until(session, 'a[80] =')
+        assigned = session.execute('next')
+        elements = variable(assigned, 'a')['data']['elements']
+        self.assertEqual([(e['index'], e['value']) for e in elements if e['state'] == 'ok'], [(80, '7')])
+        self.assertTrue(all(e['value'] is None for e in elements if e['index'] != 80))
+        for offset in (0, 70):
+            refreshed = session.window(session.run_id, item['id'], offset, 20)
+            self.assertEqual(refreshed['step'], assigned['step'])
+            self.assertTrue(all(e['state'] == 'uninitialized' and e['value'] is None
+                                for e in variable(refreshed, 'a')['data']['elements'] if e['index'] != 80))
+        historical = session.history[step]
+        self.assertTrue(all(e['state'] == 'uninitialized' and e['value'] is None
+                            for e in variable(historical, 'a')['data']['elements']))
 
     def test_unconfirmed_container_masks_length_as_well_as_elements(self):
         builder = SnapshotBuilder("")
