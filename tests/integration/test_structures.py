@@ -237,19 +237,38 @@ int main() {
 }
 ''')
         self.until(session, 's += abs')
-        for reads, uses in (([], [1]), ([], [1, 2]), ([], [1]), ([2], []),
-                            ([], [1]), ([1], []), ([1], []), ([], []), ([0], []), ([], [])):
+        for reads, uses, writes in (([], [1], []), ([], [1, 2], []), ([], [1], []), ([2], [], []),
+                                    ([], [1], [1]), ([1], [], []), ([1], [], []), ([], [], []),
+                                    ([0], [], []), ([], [], [])):
             current = session.execute('next')
             access = current['arrayAccess']
             self.assertEqual([entry['coordinates'] for entry in access['reads']], [[i] for i in reads])
             self.assertEqual([entry['coordinates'] for entry in access.get('uses', [])], [[i] for i in uses])
-            self.assertEqual(access['writes'], [])
+            self.assertEqual(access['writes'], [
+                {'variableId': variable(current, 'a')['id'], 'coordinates': [i]} for i in writes])
         # 多行调用可能中途停在实参行，只在整条语句完成后确认。
         for _ in range(6):
             current = session.execute('next')
             if current['arrayAccess'].get('uses'):
                 break
         self.assertEqual([entry['coordinates'] for entry in current['arrayAccess'].get('uses', [])], [[1]])
+
+    def test_reference_array_calls_distinguish_read_only_and_same_value_writes(self):
+        source = (Path(__file__).parents[1] / 'fixtures/cpp/reference_array_access.cpp').read_text(encoding='utf-8')
+        session = self.start(source)
+        before = self.until(session, 'int s = f')
+        array_id = variable(before, 'a')['id']
+        use = {'variableId': array_id, 'coordinates': [0]}
+        read_only = session.execute('next')
+        self.assertEqual(variable(read_only, 's')['value'], '8')
+        self.assertEqual(read_only['arrayAccess'].get('uses'), [use])
+        self.assertEqual(read_only['arrayAccess']['writes'], [])
+        for _ in range(2):
+            written = session.execute('next')
+            self.assertEqual(written['arrayAccess']['writes'], [use])
+            self.assertEqual(variable(written, 'a')['data']['elements'][0]['value'], '8')
+            self.assertFalse(variable(written, 'a')['data']['elements'][0]['changed'])
+        self.assertEqual(session.history[read_only['step']]['arrayAccess']['writes'], [])
 
     def test_entering_function_only_marks_arguments_and_caller_identity(self):
         session = self.start('''int f(int x) { // x：参数
