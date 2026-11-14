@@ -25,7 +25,7 @@
 - `line` 是下一条待执行语句；变量值是暂停时已经形成的状态。
 - `runId/step` 定位运行和步骤；`frames[].id`、`variables[].id` 区分递归、遮蔽和不同调用实例。
 - `value/previousValue` 为字符串或 null，64 位整数不经过浮点转换。
-- `state` 区分 `ok/uninitialized/unavailable/out_of_scope`，无法确认的值不能显示为 0。
+- `state` 区分 `ok/uninitialized/unavailable/out_of_scope`，无法确认的值不能显示为 0。真实检查点确认声明已执行且尚无赋值时显示 `uninitialized`（未赋值）；缺少可靠证据时显示 `unavailable`（待确认），两者均不展示原始栈值。
 - 数组结构可确认时，变量及 `data.state` 可以为 `ok`，即使部分或全部元素尚未初始化。元素是否可信必须分别检查 `data.elements[].state/value`；未赋值元素为 `uninitialized/null`，不能由整体 `ok` 推断元素可用。
 - `data` 包含结构类型、形状、下界、总长度、当前窗口及元素；仅窗口内元素被读取。
 - `arrayAccess.reads/writes/uses` 通过 `variableId/coordinates` 定位确认的访问；`uses` 表示实参使用，不能冒充确定读取。

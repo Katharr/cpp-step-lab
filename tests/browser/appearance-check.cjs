@@ -309,17 +309,23 @@ const errors = [];
       snapshot = await restoredRun('start', snapshot.runId);
       await action('stop');
     });
-    await check('真实 GCC/GDB：待确认与未赋值经输入、复制后都有变化高亮', async () => {
+    await check('真实 GCC/GDB：已执行声明的未赋值经输入、复制确认并高亮', async () => {
 
       await theme('light');
       await page.locator('#variables-splitter').press('Shift+ArrowRight');
-      await page.locator('#source').fill('#include <iostream>\nint main() {\n    int n; // n：输入的数\n    int s = 0; // s：执行位置标记\n    int q; // q：输入值的副本\n    s = 1;\n    std::cin >> n;\n    q = n;\n    std::cout << q << std::endl;\n    return 0;\n}\n');
+      await page.locator('#source').fill(fs.readFileSync(path.join(__dirname, '../fixtures/cpp/scalar_initialization.cpp'), 'utf8'));
       await page.locator('#stdin').fill('12\n');
       const row = (name) => page.locator(`#locals [data-variable="${name}"]`);
       let snapshot = await action('start', '/api/start');
       for (let i = 0; i < 5 && snapshot.line !== 6; i++) snapshot = await action('next');
       assert.equal(snapshot.line, 6);
-      assert.equal(await row('n').locator('.current-value').textContent(), '待确认');
+      const unassignedIndex = await page.locator('#history-slider').inputValue();
+      for (const name of ['n', 'q']) {
+        const variable = snapshot.variables.find(item => item.name === name && item.visible);
+        assert.equal(variable.state, 'uninitialized', `${name} 的声明已经过真实检查点`);
+        assert.equal(variable.value, null);
+      }
+      assert.equal(await row('n').locator('.current-value').textContent(), '未赋值');
       assert.equal(await row('q').locator('.current-value').textContent(), '未赋值');
       await page.screenshot({ path: path.join(output, 'real-variable-states.png') });
       snapshot = await action('next');
@@ -327,7 +333,7 @@ const errors = [];
       snapshot = await action('next');
       assert.equal(snapshot.line, 8);
       assert.equal(await row('n').locator('.current-value').textContent(), '12');
-      assert.equal(await row('n').locator('.value-before').textContent(), '待确认 → ');
+      assert.equal(await row('n').locator('.value-before').textContent(), '未赋值 → ');
       assert.match(await row('n').getAttribute('class'), /changed/);
       snapshot = await action('next');
       assert.equal(snapshot.line, 9);
@@ -339,6 +345,15 @@ const errors = [];
       await action('next');
       assert.doesNotMatch(await row('q').getAttribute('class') || '', /changed/);
       assert.equal((await page.locator('#stdout').textContent()).trim(), '12');
+      await page.locator('#history-slider').evaluate((slider, index) => {
+        slider.value = index;
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+      }, unassignedIndex);
+      assert.equal(await row('n').locator('.current-value').textContent(), '未赋值');
+      assert.equal(await row('q').locator('.current-value').textContent(), '未赋值');
+      await page.locator('#history-latest').click();
+      assert.equal(await row('n').locator('.current-value').textContent(), '12');
+      assert.equal(await row('q').locator('.current-value').textContent(), '12');
       await action('stop');
     });
     assert.deepEqual(errors, []);
