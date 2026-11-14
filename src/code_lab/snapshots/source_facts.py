@@ -18,6 +18,7 @@ class SourceFacts:
         self.declarations = {}
         self.actions = {}
         self.custom_callables = set()
+        self.index_cache = {}
         for node in walk(self.tree.root_node):
             if node.type in ("function_declarator", "preproc_function_def", "preproc_def"):
                 name = node.child_by_field_name("declarator" if node.type == "function_declarator" else "name")
@@ -86,8 +87,12 @@ class SourceFacts:
         """以当前语法事实验证表达式来源，不求值用户程序。"""
         return safe_value(self, node, known, containers)
 
-    def index_relationships(self):
-        """只沿直接下标与纯标量计算关联，按词法声明区分同名变量。"""
+    def index_relationships(self, line=None, offset=None):
+        """仅关联方括号内的变量；循环内保持稳定，其余按当前语句选择。"""
+        key = (line, offset)
+        if key in self.index_cache:
+            return self.index_cache[key]
+
         def resolve(node):
             name = self.text(node)
             matches = []
@@ -101,7 +106,6 @@ class SourceFacts:
                     matches.append((scope.end_byte - scope.start_byte, -line, (line, name)))
             return min(matches)[2] if matches else None
 
-        graph = {}
         direct = {}
         for node in walk(self.tree.root_node):
             if node.type == "subscript_expression":
@@ -111,26 +115,20 @@ class SourceFacts:
                     continue
                 array = resolve(base)
                 if array:
-                    direct.setdefault(array, set()).update(resolve(part) for part in walk(indices) if part.type == "identifier")
-            if node.type not in ("init_declarator", "assignment_expression"):
-                continue
-            left = node.child_by_field_name("declarator" if node.type == "init_declarator" else "left")
-            right = node.child_by_field_name("value" if node.type == "init_declarator" else "right")
-            operator = node.child_by_field_name("operator")
-            if (left is None or left.type != "identifier" or right is None
-                    or operator is not None and self.text(operator) != "="
-                    or any(part.type in ("subscript_expression", "call_expression", "update_expression", "assignment_expression") for part in walk(right))):
-                continue
-            target = resolve(left)
-            dependencies = {resolve(part) for part in walk(right) if part.type == "identifier"}
-            for dependency in dependencies - {None, target}:
-                graph.setdefault(target, set()).add(dependency)
-                graph.setdefault(dependency, set()).add(target)
-        for array, seeds in direct.items():
+                    region = node
+                    parent = node.parent
+                    while parent is not None:
+                        if parent.type in ("for_statement", "while_statement", "do_statement"):
+                            region = parent
+                            break
+                        if region == node and parent.type.endswith("statement"):
+                            region = parent
+                        parent = parent.parent
+                    active = (region.start_byte <= offset < region.end_byte if offset is not None else
+                              line is None or region.start_point.row + 1 <= line <= region.end_point.row + 1)
+                    if active:
+                        direct.setdefault(array, set()).update(resolve(part) for part in walk(indices) if part.type == "identifier")
+        for seeds in direct.values():
             seeds.discard(None)
-            pending = list(seeds)
-            while pending:
-                for dependency in graph.get(pending.pop(), set()) - seeds - {None, array}:
-                    seeds.add(dependency)
-                    pending.append(dependency)
+        self.index_cache[key] = direct
         return direct

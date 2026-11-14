@@ -228,7 +228,9 @@ int main() {
     await check('相邻交换：仅真实变化格强调，右侧越界不指向合法格', async () => {
       let s = await sample('adjacent');
       s = await until(s, (s) => s.variables.some((v) => v.name === 'i' && v.state === 'ok'));
-      await card('a').getByLabel('a 下标', { exact: true }).selectOption(s.variables.find((v) => v.name === 'i').id);
+      await card('a').locator('.multi-index-controls').evaluate(n => n.open = true);
+      if (await card('a').getByRole('button', {name:'固定下标 i',exact:true}).count()) await card('a').getByRole('button', {name:'固定下标 i',exact:true}).click();
+      else await card('a').getByLabel('关联下标 i', {exact:true}).check();
       assert.equal(await card('a').locator('.index-pointer:not(.index-ghost)').getAttribute('data-position'), '1');
       s = await until(s, (s) => s.variables.some((v) => v.name === 'a' && v.data?.elements[1]?.changed));
       assert.equal(await card('a').locator('.element.changed').getAttribute('data-index'), '1');

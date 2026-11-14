@@ -15,7 +15,7 @@ class StructureTests(unittest.TestCase):
         current = self.until(session, 'if (a[m]')
         a = variable(current, 'a')
         links = current['indexAssociations'][a['id']]
-        self.assertEqual({v['name'] for v in current['variables'] if v['id'] in links}, {'l', 'r', 'm'})
+        self.assertEqual({v['name'] for v in current['variables'] if v['id'] in links}, {'m'})
         before = {v['id']: v['value'] for v in current['variables']}
         saved = session.execute('next')
         self.assertEqual(saved['indexPreviousValues'], before)
@@ -24,6 +24,68 @@ class StructureTests(unittest.TestCase):
         self.assertEqual(refreshed['indexPreviousValues'], saved['indexPreviousValues'])
         self.assertEqual(refreshed['step'], saved['step'])
 
+    def test_same_line_loops_use_real_pause_position_for_indices(self):
+        session = self.start('''int main() {
+    int a[3] = {}; // a：演示数组
+    int i = 0; // i：首个循环下标
+    int j = 0; // j：后续循环下标
+    for (i = 0; i < 1; i++) { a[i] = 1; } for (j = 0; j < 1; j++) { a[j] = 2; }
+    return 0;
+}
+''')
+        stages = []
+        for _ in range(30):
+            current = session.history[-1]
+            a = next((v for v in current['variables'] if v['name'] == 'a'), None)
+            if a:
+                ids = current['indexAssociations'].get(a['id'], [])
+                names = {v['name'] for v in current['variables'] if v['id'] in ids}
+                self.assertNotEqual(names, {'i', 'j'}, '同一行的两个循环不能同时自动强调')
+                if names and (not stages or names != stages[-1]):
+                    stages.append(names)
+            if current['status'] != 'paused':
+                break
+            session.execute('next')
+        self.assertEqual(stages, [{'i'}, {'j'}])
+
+    def test_global_index_uses_active_frame_stage(self):
+        session = self.start('''int a[3] = {}; // a：全局数组
+int i = 0; // i：全局下标
+int main() {
+    for (i = 0; i < 2; i++) {
+        a[i] = 1;
+    }
+    return 0;
+}
+''')
+        current = self.until(session, 'a[i] = 1')
+        links = current['indexAssociations'][variable(current, 'a', None)['id']]
+        self.assertEqual(links, [variable(current, 'i', None)['id']])
+        current = self.until(session, 'return 0')
+        self.assertEqual(current['indexAssociations'][variable(current, 'a', None)['id']], [])
+
+    def test_automatic_indices_follow_loop_stages_without_assignment_spread(self):
+        source = (Path(__file__).parents[1] / 'fixtures/cpp/index_stages.cpp').read_text(encoding='utf-8')
+        input_path = self.root / 'input.txt'
+        input_path.write_text('5 6 7', encoding='utf-8')
+        session = self.start(source, input_path=input_path)
+        def names(current):
+            links = current['indexAssociations'].get(variable(current, 'a')['id'], [])
+            return {v['name'] for v in current['variables'] if v['id'] in links}
+        current = self.until(session, 'std::cin >> a[i]')
+        self.assertEqual(names(current), {'i'})
+        current = session.execute('next')
+        self.assertEqual(names(current), {'i'}, '循环内其他语句保持显示')
+        current = self.until(session, 'a[j+1] = a[j]')
+        self.assertEqual(names(current), {'j'})
+        current = session.execute('next')
+        self.assertEqual(names(current), {'j'})
+        a = variable(current, 'a')
+        j = int(variable(current, 'j')['value'])
+        self.assertEqual(current['arrayAccess']['writes'], [{'variableId': a['id'], 'coordinates': [j + 1]}])
+        current = self.until(session, 'i = -1')
+        self.assertEqual(names(current), set(), '退出循环不累积自动下标')
+
     def test_index_names_and_recursive_instances_are_independent(self):
         source = (Path(__file__).parents[1] / 'fixtures/cpp/binary_indices.cpp').read_text(encoding='utf-8')
         import re
@@ -31,7 +93,7 @@ class StructureTests(unittest.TestCase):
         session = self.start(source)
         current = self.until(session, 'if (a[z]')
         links = current['indexAssociations'][variable(current, 'a')['id']]
-        self.assertEqual({v['name'] for v in current['variables'] if v['id'] in links}, {'x', 'y', 'z'})
+        self.assertEqual({v['name'] for v in current['variables'] if v['id'] in links}, {'z'})
         session = self.start((Path(__file__).parents[1] / 'fixtures/cpp/index_identity.cpp').read_text(encoding='utf-8'))
         for _ in range(60):
             current = session.execute('step')

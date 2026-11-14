@@ -34,7 +34,27 @@
         "dataSettings": {
           "type": "array",
           "items": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "axes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "manualIndices": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "excludedIndices": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "layout": {

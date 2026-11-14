@@ -1,5 +1,5 @@
 import { $, notice, node } from "../../shared/dom.js";
-import { mergeIndices, isIndexCandidate, indexChoices, markerValues, drawMarkers, indexColor } from './index-markers.js';
+import { clearIndexLayouts, mergeIndices, isIndexCandidate, indexChoices, markerValues, drawMarkers, indexColor } from './index-markers.js';
 import * as CellAccess from './cell-access.js';
 export function createData({
   state,
@@ -29,7 +29,9 @@ export function createData({
       const settings = state.dataSettings.get(variable.id);
       // for 下标可能晚于数组声明，保留待关联标识，出现时再映射至本次运行。
       // 从当前设置出发，避免覆盖老师后来手动取消或更换的关联。
-      settings.axes = (settings.axes || []).map(id => id ? (result.variables || []).find(item => presentationKey(item.id) === presentationKey(id))?.id || id : '');
+      for (const key of ['axes', 'manualIndices', 'excludedIndices']) {
+        if (settings[key]) settings[key] = settings[key].map(id => id ? (result.variables || []).find(item => presentationKey(item.id) === presentationKey(id))?.id || id : '');
+      }
       if (preset.prefixApplied && variable.data.state === 'ok' && result.status === 'paused' && !state.restoredPrefixWindows.has(variable.id)) {
         if (variable.data.offset !== 0 || variable.data.limit !== preset.prefixLimit) {
           result = await client.request('/api/window', {
@@ -47,7 +49,7 @@ export function createData({
   }
   function renderData({ animate = false } = {}) {
     const container = $('data-views');
-    const oldMarkerPositions = new Map([...container.querySelectorAll('.index-pointer:not(.index-ghost)')].map(mark => [mark.closest('.data-card').dataset.variableId + ':' + mark.dataset.indexId, mark.getBoundingClientRect()]));
+    const oldMarkerPositions = new Map([...container.querySelectorAll('.index-pointer')].map(mark => [mark.closest('.data-card').dataset.variableId + ':' + mark.dataset.indexId, mark.getBoundingClientRect()]));
     const stepKey = state.snapshot ? `${state.snapshot.runId}:${state.snapshot.step}` : '';
     const animateIndices = animate && container.dataset.indexStep && container.dataset.indexStep !== stepKey && state.historyIndex === state.history.length - 1 && state.previous?.step === state.snapshot?.step - 1;
     container.dataset.indexStep = stepKey;
@@ -91,12 +93,13 @@ export function createData({
     $('frame').title = selected ? `${selected.function} · 第 ${selected.level + 1} 层` : '';
     actions.variables('frame-locals', selected?.level > 0 ? local : [], '此帧暂无可见变量');
     const views = [...local, ...global].filter(v => v.data);
+    clearIndexLayouts();
     container.replaceChildren(...views.map(variable => dataView(variable, [...local, ...global])));
     for (const card of container.querySelectorAll('.data-card[data-kind="array"]')) {
       const variable = views.find(item => item.id === card.dataset.variableId);
       drawMarkers(card, variable, markerValues(state.snapshot, state.dataSettings.get(variable.id)), offset => changeWindow(variable.id, offset, variable.data.limit, { locate: true }));
       if (animateIndices && document.documentElement.dataset.motion === 'standard') {
-        for (const mark of card.querySelectorAll('.index-pointer:not(.index-ghost)')) {
+        for (const mark of card.querySelectorAll('.index-pointer')) {
           const old = oldMarkerPositions.get(variable.id + ':' + mark.dataset.indexId);
           if (!old) continue;
           const rect = mark.getBoundingClientRect();
@@ -115,8 +118,7 @@ export function createData({
         const axes = state.dataSettings.get(variable.id)?.axes || [];
         axes.forEach((id, axis) => {
           if (id !== row.dataset.variableId) return;
-          const value = items.find(item => item.id === id);
-          labels.push(variable.data.kind === 'matrix' ? `${variable.name} · ${axis === 0 ? '行' : '列'}下标` : `下标 · ${variable.name}[${actions.valueText(value)}]`);
+          labels.push(variable.data.kind === 'matrix' ? `${variable.name} · ${axis === 0 ? '行' : '列'}下标` : `下标 · ${variable.name}`);
         });
       }
       binding.textContent = labels.join(' · ');
@@ -269,7 +271,8 @@ export function createData({
       }
     }
     content.append(tools);
-    const axes = data.kind === 'matrix' ? 2 : 1;
+    const indexPositions = data.kind === 'array' ? markerValues(state.snapshot, settings) : [];
+    const axes = data.kind === 'array' ? 0 : data.kind === 'matrix' ? 2 : 1;
     const values = [];
     const selectors = node('div', undefined, 'index-controls');
     for (let axis = 0; axis < axes; axis++) {
@@ -290,10 +293,7 @@ export function createData({
       }
       select.value = settings.axes[axis] || '';
       select.addEventListener('change', () => {
-        if (data.kind === 'array') {
-          settings.excludedIndices = [...new Set([...(settings.excludedIndices || []), ...settings.axes])].filter(id => id !== select.value);
-          settings.axes = select.value ? [select.value] : [];
-        } else settings.axes[axis] = select.value;
+        settings.axes[axis] = select.value;
         renderData();
         actions.controls();
       });
@@ -301,7 +301,7 @@ export function createData({
       const chosen = candidates.find(v => v.id === settings.axes[axis]);
       values.push(chosen?.state === 'ok' && /^-?\d+$/.test(chosen.value || '') ? BigInt(chosen.value) : null);
     }
-    tools.append(selectors);
+    if (data.kind !== 'array') tools.append(selectors);
     if (data.kind === 'array') tools.append(indexChoices(settings, candidates, renderData));
     const outside = values.some((value, axis) => value !== null && (value < BigInt(data.lowerBounds[axis] || 0) || value >= BigInt((data.lowerBounds[axis] || 0) + (data.shape[axis] || 0))));
     const indicators = values.map((value, axis) => {
@@ -365,8 +365,7 @@ export function createData({
       cell.dataset.valueState = actions.valueState(element);
       const matches = values.some(value => value !== null) && !outside && values.every((value, axis) => value === null || value === BigInt(element.coordinates[axis]));
       if (data.kind === 'array') {
-        const indices = markerValues(state.snapshot, settings);
-        if (indices.some(item => item.value === BigInt(element.coordinates[0]) || item.previous === BigInt(element.coordinates[0]))) cell.dataset.indexProtected = 'true';
+        if (indexPositions.some(item => item.value === BigInt(element.coordinates[0]))) cell.dataset.indexProtected = 'true';
       }
       if (matches && data.kind !== 'array') {
         cell.classList.add('indexed');

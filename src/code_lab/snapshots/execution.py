@@ -361,6 +361,16 @@ class ExecutionEvidence:
 
     def decorate(self, raw, motion, status="paused"):
         raw = deepcopy(raw)
+        # 使用真实暂停检查点区分同一行里的多个循环或语句，不根据已执行行猜阶段。
+        locations = {}
+        for (owner, _), pending in self.pending.items():
+            locations[owner] = pending["node"].start_byte
+        checkpoint = raw.get("checkpoint")
+        if checkpoint and raw.get("frames"):
+            site = self.plan.sites.get(checkpoint["site"])
+            if site:
+                locations[raw["frames"][0]["key"]] = site["node"].start_byte
+        raw["indexLocations"] = locations
         if raw.get("frames"):
             raw["variables"] = self._view(raw)["variables"]
         raw["execution"] = {"spans": deepcopy(self.spans), "access": deepcopy(self.access),

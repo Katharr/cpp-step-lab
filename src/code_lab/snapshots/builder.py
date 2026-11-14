@@ -43,7 +43,6 @@ def normalize_data(item, old):
 class SnapshotBuilder:
     def __init__(self, source):
         self.facts = SourceFacts(source)
-        self.index_relationships = self.facts.index_relationships()
         self.index_links = {}
         self.index_colors = {}
         self.previous = None
@@ -116,6 +115,9 @@ class SnapshotBuilder:
                     "line": frames[0]["line"] if frames and status == "paused" else None,
                     "frames": frames, "variables": variables, "output": output,
                     "outputDelta": delta, "status": status, "reason": reason}
+        active_relationships = {frame["key"]: self.facts.index_relationships(frame.get("line"), raw.get("indexLocations", {}).get(frame["key"]))
+                                if frame.get("line") and frame.get("user", True) else {} for frame in frames}
+        self.index_links = {}
         for item in variables:
             if not item.get("data") and item["id"] not in self.index_colors:
                 self.index_colors[item["id"]] = len(self.index_colors)
@@ -123,9 +125,13 @@ class SnapshotBuilder:
                 item["indexColor"] = self.index_colors[item["id"]]
             if (item.get("data") or {}).get("kind") != "array":
                 continue
-            related = self.index_relationships.get((item["declaration"], item["name"]), set())
             links = self.index_links.setdefault(item["id"], [])
             for candidate in variables:
+                owner = candidate["frameKey"]
+                if candidate["kind"] == "global":
+                    owner = item["frameKey"] if item["kind"] != "global" else frames[0]["key"] if frames else None
+                relationships = active_relationships.get(owner, {})
+                related = relationships.get((item["declaration"], item["name"]), set())
                 if ((candidate["declaration"], candidate["name"]) in related
                         and not candidate.get("data") and candidate["state"] != "out_of_scope"
                         and (candidate["kind"] == "global" or candidate["frameKey"] == item["frameKey"] or item["kind"] == "global" and candidate["frame"] == 0)

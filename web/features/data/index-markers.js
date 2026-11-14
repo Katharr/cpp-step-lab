@@ -1,5 +1,14 @@
 import { node } from '../../shared/dom.js';
 
+const layouts = new Map();
+const resizeObserver = new ResizeObserver(entries => {
+  for (const { target } of entries) layouts.get(target)?.();
+});
+export function clearIndexLayouts() {
+  resizeObserver.disconnect();
+  layouts.clear();
+}
+
 const palette = ['#007f83', '#8555c4', '#bd356d', '#336dc1', '#867000', '#a44b23', '#477c35'];
 export function isIndexCandidate(variable) {
   const type = variable.type.replace(/\b(?:const|volatile)\b/g, '').trim().replace(/\s+/g, ' ');
@@ -10,29 +19,42 @@ export function indexColor(variable) {
   return serial < palette.length ? palette[serial] : `hsl(${(serial * 137.508) % 360} 55% 42%)`;
 }
 export function mergeIndices(settings, snapshot, variable) {
+  settings.manualIndices ||= [...(settings.axes || [])];
   settings.excludedIndices ||= [];
-  settings.axes = [...new Set([...(settings.axes || []), ...(snapshot?.indexAssociations?.[variable.id] || [])])]
+  settings.axes = [...new Set([...settings.manualIndices, ...(snapshot?.indexAssociations?.[variable.id] || [])])]
     .filter(id => id && !settings.excludedIndices.includes(id));
+}
+export function chooseIndex(settings, id, checked) {
+  settings.manualIndices = (settings.manualIndices || []).filter(value => value !== id);
+  settings.excludedIndices = (settings.excludedIndices || []).filter(value => value !== id);
+  if (checked) settings.manualIndices.push(id);
+  else settings.excludedIndices.push(id);
 }
 export function indexChoices(settings, candidates, rerender) {
   const controls = node('details', undefined, 'multi-index-controls');
   controls.open = Boolean(settings.indexOpen);
   controls.addEventListener('toggle', () => { if (controls.isConnected) settings.indexOpen = controls.open; });
-  controls.append(node('summary', '关联多个下标'));
+  controls.append(node('summary', '下标标记'));
+  controls.append(node('p', '自动跟随当前循环；手动勾选可固定显示。', 'data-note'));
   for (const item of candidates.filter(isIndexCandidate)) {
     const label = node('label');
     const input = node('input');
     input.type = 'checkbox';
     input.checked = settings.axes.includes(item.id);
-    input.setAttribute('aria-label', `关联下标 ${item.name}`);
+    const name = item.name + (item.kind === 'global' ? '（全局）' : '');
+    input.setAttribute('aria-label', `关联下标 ${name}`);
     input.addEventListener('change', () => {
-      settings.axes = settings.axes.filter(id => id !== item.id);
-      settings.excludedIndices = settings.excludedIndices.filter(id => id !== item.id);
-      if (input.checked) settings.axes.push(item.id);
-      else settings.excludedIndices.push(item.id);
+      chooseIndex(settings, item.id, input.checked);
       rerender();
     });
-    label.append(input, document.createTextNode(item.name));
+    label.append(input, document.createTextNode(name));
+    if (input.checked && !settings.manualIndices.includes(item.id)) {
+      const pin = node('button', '固定');
+      pin.type = 'button';
+      pin.setAttribute('aria-label', `固定下标 ${name}`);
+      pin.addEventListener('click', () => { chooseIndex(settings, item.id, true); rerender(); });
+      label.append(pin);
+    }
     controls.append(label);
   }
   return controls;
@@ -51,8 +73,7 @@ export function markerValues(snapshot, settings) {
     if (current) settings.indexMetadata[id] = { name: current.name, indexColor: current.indexColor };
     const variable = current || { ...settings.indexMetadata[id], state: 'out_of_scope' };
     const parse = value => /^-?\d+$/.test(value ?? '') ? BigInt(value) : null;
-    return { id, variable, value: variable?.state === 'ok' ? parse(variable.value) : null,
-      previous: parse(snapshot.indexPreviousValues?.[id]) };
+    return { id, variable, value: variable?.state === 'ok' ? parse(variable.value) : null };
   });
 }
 export function drawMarkers(card, variable, markers, locate) {
@@ -62,64 +83,89 @@ export function drawMarkers(card, variable, markers, locate) {
   const upper = lower + BigInt(data.total);
   const hints = node('div', undefined, 'index-hints');
   const leftHints = node('div', undefined, 'index-hints-left');
-  const unknownHints = node('div', undefined, 'index-hints-unknown');
   const rightHints = node('div', undefined, 'index-hints-right');
-  hints.append(leftHints, unknownHints, rightHints);
+  hints.append(leftHints, node('div', undefined, 'index-hints-unknown'), rightHints);
   card.querySelector('.data-content').insertBefore(hints, card.querySelector('.structure-scroll'));
-  const targets = [];
+  const cells = new Map([...grid.querySelectorAll('.element[data-coordinates]')].map(cell => [cell.dataset.coordinates, cell]));
+  const targets = new Map();
   for (const marker of markers) {
-    const { value, previous, variable: item } = marker;
-    const name = item?.name || '下标变量';
-    const color = indexColor(item);
-    if (value === null) {
-      const hint = node('span', `${name}：${item?.state === 'uninitialized' ? '未赋值' : '值未确认或已离开作用域'}`);
+    if (marker.value === null) continue;
+    const position = String(marker.value);
+    const name = marker.variable?.name || '下标变量';
+    const color = indexColor(marker.variable);
+    const cell = cells.get(position);
+    if (cell) {
+      if (!targets.has(position)) targets.set(position, { position, cell, members: [] });
+      targets.get(position).members.push({ ...marker, name, color });
+    } else {
+      const outside = marker.value < lower || marker.value >= upper;
+      const left = marker.value < BigInt(data.offset) + lower;
+      const hint = node(outside ? 'span' : 'button', `${left ? '← ' : ''}${name}${outside ? ' · 越界' : ''}${left ? '' : ' →'}`);
       hint.style.color = color;
-      unknownHints.append(hint);
-    }
-    for (const [position, ghost] of [[value, false], [previous, true]]) {
-      if (position === null || ghost && (position === value || value === null)) continue;
-      const cell = [...grid.querySelectorAll('.element[data-coordinates]')].find(cell => cell.dataset.coordinates === String(position));
-      if (cell) targets.push({ ...marker, position, ghost, cell, color, name });
-      else {
-        const outside = position < lower || position >= upper;
-        const left = position < BigInt(data.offset) + lower;
-        const hint = node(!outside && !ghost ? 'button' : 'span', `${left ? '←' : '→'} ${name} = ${position} · ${outside ? '越界' : '窗口外'}${ghost ? '（上一步）' : ''}`, ghost ? 'index-ghost-hint' : '');
-        hint.style.color = color;
-        if (hint.tagName === 'BUTTON') {
-          hint.type = 'button';
-          hint.addEventListener('click', () => locate(Number(position - lower)));
-        }
-        (left ? leftHints : rightHints).append(hint);
+      hint.title = outside ? `${name} 超出数组范围` : `定位 ${name}`;
+      if (!outside) {
+        hint.type = 'button';
+        hint.setAttribute('aria-label', `定位下标 ${name}`);
+        hint.addEventListener('click', () => locate(Number(marker.value - lower)));
       }
+      (left ? leftHints : rightHints).append(hint);
     }
   }
-  // 所有标签在数组自己的滚动平面内排布；折叠后的实际格子坐标是唯一定位依据。
-  const width = grid.scrollWidth;
-  const lanes = [];
-  const placed = targets.map(target => {
-    const text = `${target.name} = ${target.position}${target.ghost ? ' · 前' : ''}`;
-    const size = Math.min(width, Math.max(64, text.length * 8 + 16));
-    const x = target.cell.offsetLeft - grid.offsetLeft + target.cell.offsetWidth / 2;
-    return { ...target, text, size, x, left: Math.max(0, Math.min(width - size, x - size / 2)) };
-  }).sort((a, b) => Number(a.ghost) - Number(b.ghost) || a.left - b.left);
-  for (const target of placed) {
-    let lane = lanes.findIndex(end => end + 8 <= target.left);
-    if (lane < 0) lane = lanes.length;
-    lanes[lane] = target.left + target.size;
-    target.y = lane * 29 + 3;
-  }
-  const height = lanes.length ? lanes.length * 29 + 22 : 0;
+  grid.style.minWidth = '';
+  const height = markers.length ? 34 : 0;
   grid.style.paddingTop = `${height + 4}px`;
   grid.classList.add('multi-index-grid');
-  const layer = svg('svg', { class: 'index-marker-layer', width, height, 'aria-label': '数组下标位置' });
-  for (const target of placed) {
-    const group = svg('g', { 'data-index-id': target.id, 'data-position': target.position,
-      class: target.ghost ? 'index-pointer index-ghost' : 'index-pointer', color: target.color });
-    const center = target.left + target.size / 2;
-    group.append(svg('path', { d: `M ${target.ghost ? target.x : center} ${target.ghost ? height - 16 : target.y + 23} L ${target.x} ${height - 3} m -4 -6 l 4 6 l 4 -6`, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8 }),
-      svg('rect', { x: target.left, y: target.y, width: target.size, height: 23, rx: 4, fill: 'var(--surface)', stroke: 'currentColor' }),
-      svg('text', { x: center, y: target.y + 16, 'text-anchor': 'middle', fill: 'currentColor' }, target.text));
-    layer.append(group);
-  }
+  const layer = svg('svg', { class: 'index-marker-layer', width: grid.scrollWidth, height, 'aria-label': '数组下标位置' });
   grid.append(layer);
+  const placed = [...targets.values()].map(target => {
+    const group = svg('g', { 'data-index-id': target.members.map(member => member.id).join('|'),
+      'data-position': target.position, class: 'index-pointer', color: target.members[0].color });
+    const label = svg('text', { y: 13, 'text-anchor': 'middle' });
+    target.members.forEach((member, index) => {
+      if (index) label.append(svg('tspan', { fill: 'var(--muted)' }, ' · '));
+      label.append(svg('tspan', { fill: member.color, 'data-index-id': member.id }, member.name));
+    });
+    group.append(label);
+    group.setAttribute('aria-label', target.members.map(member => member.name).join('、') + '的当前位置');
+    layer.append(group);
+    return { ...target, group, label, size: Math.max(16, label.getComputedTextLength()) + 8 };
+  });
+  function layout() {
+    if (!grid.getClientRects().length) return;
+    for (const target of placed) target.size = Math.max(16, target.label.getComputedTextLength()) + 8;
+    const required = placed.reduce((sum, target) => sum + target.size + 6, 0);
+    grid.style.minWidth = '';
+    layer.style.display = 'none';
+    if (required > grid.scrollWidth) grid.style.minWidth = `${required}px`;
+    const width = grid.scrollWidth;
+    layer.setAttribute('width', width);
+    layer.style.display = '';
+    const bounds = grid.getBoundingClientRect();
+    for (const target of placed) {
+      const rect = target.cell.getBoundingClientRect();
+      target.x = rect.left - bounds.left + rect.width / 2;
+    }
+    placed.sort((a, b) => a.x - b.x);
+    let end = -6;
+    for (const target of placed) {
+      target.left = Math.max(end + 6, Math.min(width - target.size, target.x - target.size / 2));
+      end = target.left + target.size;
+    }
+    let right = width;
+    for (const target of [...placed].reverse()) {
+      target.left = Math.min(target.left, right - target.size);
+      right = target.left - 6;
+    }
+    for (const target of placed) {
+      const center = target.left + target.size / 2;
+      target.label.setAttribute('x', center);
+      target.group.querySelector('path')?.remove();
+      target.group.prepend(svg('path', { d: `M ${center} 18 L ${target.x} 31 m -3 -4 l 3 4 l 3 -4`,
+        fill: 'none', stroke: 'currentColor', 'stroke-width': 1.35, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    }
+  }
+  layout();
+  const scroll = card.querySelector('.structure-scroll');
+  layouts.set(scroll, layout);
+  resizeObserver.observe(scroll);
 }

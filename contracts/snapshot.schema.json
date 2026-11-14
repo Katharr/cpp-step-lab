@@ -153,8 +153,8 @@
       ]
     },
     "indexAssociations": {
+      "description": "当前调用帧所在循环或语句内直接使用的下标身份，不沿赋值传播；每个暂停点独立保存。",
       "type": "object",
-      "description": "一维数组稳定身份到自动关联下标身份列表；本运行中保留。",
       "additionalProperties": {
         "type": "array",
         "items": {

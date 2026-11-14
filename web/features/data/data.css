@@ -89,12 +89,12 @@ html[data-theme='dark'] .element.zero-value.changed .element-value { color: var(
 .multi-index-grid { position: relative; }
 .index-marker-layer { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
 .index-pointer { font: 600 13px var(--font-mono); transform-box: fill-box; transform-origin: center; }
-.index-ghost { opacity: .38; }
 .index-hints { display: flex; gap: 6px 12px; flex-wrap: wrap; font: 12px var(--font-mono); }
-.index-hints button { font: inherit; background: var(--surface); border: 1px solid currentColor; border-radius: 4px; cursor: pointer; }
-.index-ghost-hint { opacity: .55; }
+.index-hints button { font: inherit; background: transparent; border: 0; border-radius: 4px; padding: 2px 4px; cursor: pointer; }
+.index-hints button:hover { background: var(--surface-2); }
+.index-hints:empty { display: none; }
 .multi-index-controls label { display: inline-flex; align-items: center; margin-right: 10px; color: var(--text); }
-.index-variable td.value-cell { background: color-mix(in srgb, var(--index-color) 12%, var(--surface)); box-shadow: inset 3px 0 var(--index-color), inset 0 0 0 1px color-mix(in srgb, var(--index-color) 70%, transparent); }
+.index-variable .variable-binding::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--index-color); }
 html[data-theme='dark'] .index-pointer, html[data-theme='dark'] .index-hints > * { filter: brightness(1.55); }
 
 .index-hints { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); align-items: start; }

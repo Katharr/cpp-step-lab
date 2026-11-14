@@ -8,7 +8,7 @@
     "test:data": "node tests/browser/data-check.cjs",
     "test:layout": "node tests/browser/layout-check.cjs",
     "test:appearance": "node tests/browser/appearance-check.cjs",
-    "test:visual": "node tests/browser/data-visual-check.cjs && node tests/browser/access-check.cjs && node tests/browser/growth-check.cjs && node tests/browser/index-check.cjs",
+    "test:visual": "node tests/browser/data-visual-check.cjs && node tests/browser/access-check.cjs && node tests/browser/growth-check.cjs && node tests/browser/index-check.cjs && node tests/browser/index-layout-check.cjs",
     "test:delivery": "node tests/delivery/delivery-check.cjs"
   },
   "devDependencies": {

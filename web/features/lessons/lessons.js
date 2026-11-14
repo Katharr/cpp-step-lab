@@ -79,6 +79,8 @@ export function createLessons({
         id,
         open: Boolean(value.open),
         axes: [...(value.axes || [])],
+        manualIndices: [...(value.manualIndices || value.axes || [])],
+        excludedIndices: [...(value.excludedIndices || [])],
         prefixLimit: value.prefixLimit,
         prefixApplied: Boolean(value.prefixApplied)
       }))
@@ -145,6 +147,8 @@ export function createLessons({
         state.dataSettings.set(item.id, {
           open: Boolean(item.open),
           axes: Array.isArray(item.axes) ? [...item.axes] : [],
+          manualIndices: Array.isArray(item.manualIndices) ? [...item.manualIndices] : (Array.isArray(item.axes) ? [...item.axes] : []),
+          excludedIndices: Array.isArray(item.excludedIndices) ? [...item.excludedIndices] : [],
           prefixLimit,
           prefixApplied: Boolean(item.prefixApplied)
         });
